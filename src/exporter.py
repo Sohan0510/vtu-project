@@ -16,6 +16,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side, numbers
 from openpyxl.utils import get_column_letter
 from src.config import EXPORTS_DIR
+from src.calculator import calculate_sgpa, calculate_cgpa
 
 
 # ── Style Constants ──
@@ -121,7 +122,7 @@ def export_to_excel(results, prefix="results"):
     title_cell.font = TITLE_FONT
     title_cell.alignment = Alignment(horizontal='center', vertical='center')
     
-    ws_summary.merge_cells('A2:K2')
+    ws_summary.merge_cells('A2:M2')
     subtitle_cell = ws_summary['A2']
     subtitle_cell.value = f"USN Range: {usn_range}  |  Students: {len(results)}  |  Generated: {datetime.now().strftime('%d-%b-%Y %I:%M %p')}"
     subtitle_cell.font = SUBTITLE_FONT
@@ -130,7 +131,7 @@ def export_to_excel(results, prefix="results"):
     summary_headers = [
         "Sl.", "USN", "Student Name", "Semesters",
         "Subjects", "Passed", "Failed",
-        "Grand Total", "Percentage", "Overall", "Reval Status"
+        "Grand Total", "Percentage", "Latest SGPA", "CGPA", "Overall", "Reval Status"
     ]
     
     for col, header in enumerate(summary_headers, 1):
@@ -179,8 +180,13 @@ def export_to_excel(results, prefix="results"):
             max_total = grand_total
             topper_row = row_num
         
+        # Calculate SGPA and CGPA
+        latest_sem = max(sems) if sems else 0
+        sgpa, _ = calculate_sgpa(subjects, target_sem=latest_sem)
+        cgpa, _ = calculate_cgpa(subjects)
+        
         row_data = [sl, usn, name, sems_str, total_subs, passed, failed,
-                     grand_total, percentage, overall, reval_text]
+                     grand_total, percentage, sgpa, cgpa, overall, reval_text]
         
         for col, value in enumerate(row_data, 1):
             cell = ws_summary.cell(row=row_num, column=col, value=value)
@@ -189,16 +195,16 @@ def export_to_excel(results, prefix="results"):
             
             if col == 2:  # USN monospace
                 cell.font = Font(name='Consolas', size=10, bold=True)
-            elif col == 9:  # Percentage
-                cell.number_format = '0.0'
-            elif col == 10:  # Overall
+            elif col in (9, 10, 11):  # Percentage, SGPA, CGPA
+                cell.number_format = '0.00'
+            elif col == 12:  # Overall
                 cell.fill = PASS_FILL if value == "PASS" else FAIL_FILL
                 cell.font = Font(name='Calibri', bold=True, size=10)
-            elif col == 11 and value:  # Reval
+            elif col == 13 and value and value != "-":  # Reval Status
                 cell.fill = REVAL_FILL
             
             # Alternating row colors for readability
-            if sl % 2 == 0 and col not in (10, 11):
+            if sl % 2 == 0 and col not in (12, 13):
                 cell.fill = ALT_ROW_FILL
         
         row_num += 1
@@ -237,12 +243,12 @@ def export_to_excel(results, prefix="results"):
         value_cell.border = THIN_BORDER
         value_cell.alignment = DATA_ALIGNMENT
     
-    summary_widths = [6, 15, 28, 10, 10, 9, 9, 12, 10, 10, 8]
+    summary_widths = [6, 15, 28, 10, 10, 9, 9, 12, 10, 11, 11, 10, 12]
     for i, width in enumerate(summary_widths, 1):
         ws_summary.column_dimensions[get_column_letter(i)].width = width
     
     ws_summary.freeze_panes = 'A5'
-    ws_summary.auto_filter.ref = f"A4:K{row_num - 2}"
+    ws_summary.auto_filter.ref = f"A4:M{row_num - 2}"
     
     # ══════════════════════════════════════════
     # SHEET 2: DETAILED MARKS
@@ -258,7 +264,7 @@ def export_to_excel(results, prefix="results"):
     
     detail_headers = [
         "Sl.", "USN", "Student Name", "Sem", "Subject Code",
-        "Subject Name", "Internal", "Old Ext", "New Ext", "Total", "Result", "Reval Status"
+        "Subject Name", "Internal", "Old Ext", "New Ext", "Total", "Result", "Reval Status", "SGPA", "CGPA"
     ]
     
     for col, header in enumerate(detail_headers, 1):
@@ -283,17 +289,20 @@ def export_to_excel(results, prefix="results"):
                 sem_groups[sem] = []
             sem_groups[sem].append((sub_code, sub))
         
-        for sem in sorted(sem_groups.keys()):
-            for sub_code, sub in sorted(sem_groups[sem], key=lambda x: x[0]):
-                is_reval = sub.get("reval_updated", False)
-                old_ext = sub.get("old_marks", "-")
-                new_ext = sub.get("externals", 0)
-                reval_status = student.get("reval_status", "-")
-                row_data = [
-                    sl_no, usn, name, sem, sub_code, sub.get("name", ""),
-                    sub.get("internals", 0), old_ext, new_ext,
-                    sub.get("total", 0), sub.get("status", ""), reval_status
-                ]
+            cgpa, _ = calculate_cgpa(subjects)
+            for sem in sorted(sem_groups.keys()):
+                sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+                for sub_code, sub in sorted(sem_groups[sem], key=lambda x: x[0]):
+                    is_reval = sub.get("reval_updated", False)
+                    old_ext = sub.get("old_marks", "-")
+                    new_ext = sub.get("externals", 0)
+                    reval_status = student.get("reval_status", "-")
+                    row_data = [
+                        sl_no, usn, name, sem, sub_code, sub.get("name", ""),
+                        sub.get("internals", 0), old_ext, new_ext,
+                        sub.get("total", 0), sub.get("status", ""), reval_status,
+                        sem_sgpa, cgpa
+                    ]
                 
                 for col, value in enumerate(row_data, 1):
                     cell = ws_detail.cell(row=row_num, column=col, value=value)
@@ -314,13 +323,13 @@ def export_to_excel(results, prefix="results"):
                 sl_no += 1
                 row_num += 1
     
-    detail_widths = [6, 15, 25, 6, 14, 40, 10, 10, 10, 8, 8, 14]
+    detail_widths = [6, 15, 25, 6, 14, 40, 10, 10, 10, 8, 8, 14, 10, 10]
     for i, width in enumerate(detail_widths, 1):
         ws_detail.column_dimensions[get_column_letter(i)].width = width
     
     ws_detail.freeze_panes = 'A4'
     if row_num > 4:
-        ws_detail.auto_filter.ref = f"A3:L{row_num - 1}"
+        ws_detail.auto_filter.ref = f"A3:N{row_num - 1}"
     
     # ══════════════════════════════════════════
     # PER-SEMESTER SHEETS
@@ -346,7 +355,7 @@ def export_to_excel(results, prefix="results"):
         
         sem_headers = [
             "Sl.", "USN", "Student Name", "Subject Code",
-            "Subject Name", "Internal", "Old Ext", "New Ext", "Total", "Result", "Reval Status"
+            "Subject Name", "Internal", "Old Ext", "New Ext", "Total", "Result", "Reval Status", "SGPA", "CGPA"
         ]
         for col, header in enumerate(sem_headers, 1):
             ws_sem.cell(row=3, column=col, value=header)
@@ -368,6 +377,9 @@ def export_to_excel(results, prefix="results"):
             if not sem_subs:
                 continue
             
+            cgpa, _ = calculate_cgpa(subjects)
+            sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+            
             for sub_code in sorted(sem_subs.keys()):
                 sub = sem_subs[sub_code]
                 is_reval = sub.get("reval_updated", False)
@@ -377,7 +389,8 @@ def export_to_excel(results, prefix="results"):
                 row_data = [
                     sl_no, usn, name, sub_code, sub.get("name", ""),
                     sub.get("internals", 0), old_ext, new_ext,
-                    sub.get("total", 0), sub.get("status", ""), reval_status
+                    sub.get("total", 0), sub.get("status", ""), reval_status,
+                    sem_sgpa, cgpa
                 ]
                 
                 for col, value in enumerate(row_data, 1):
@@ -423,17 +436,17 @@ def export_to_excel(results, prefix="results"):
         stats_cell = ws_sem.cell(row=row_num, column=1, value=f"Sem {sem}: {len(sem_students)} students | {sem_pass} passed | {sem_fail} failed | {round(sem_pass/max(len(sem_students),1)*100,1)}% pass rate")
         stats_cell.font = STATS_FONT
         stats_cell.fill = STATS_FILL
-        for col in range(1, 12):
+        for col in range(1, 14):
             ws_sem.cell(row=row_num, column=col).border = THIN_BORDER
             ws_sem.cell(row=row_num, column=col).fill = STATS_FILL
         
-        sem_widths = [6, 15, 25, 14, 40, 10, 10, 10, 8, 8, 14]
+        sem_widths = [6, 15, 25, 14, 40, 10, 10, 10, 8, 8, 14, 10, 10]
         for i, width in enumerate(sem_widths, 1):
             ws_sem.column_dimensions[get_column_letter(i)].width = width
         
         ws_sem.freeze_panes = 'A4'
         if row_num > 4:
-            ws_sem.auto_filter.ref = f"A3:K{row_num - 1}"
+            ws_sem.auto_filter.ref = f"A3:M{row_num - 1}"
     
     # ══════════════════════════════════════════
     # ANALYTICS SHEET

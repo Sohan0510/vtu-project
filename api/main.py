@@ -26,6 +26,7 @@ from src.database import (
     get_results_by_usn_range
 )
 from src.exporter import export_to_excel
+from src.calculator import calculate_sgpa, calculate_cgpa
 from src.config import EXPORTS_DIR
 
 # Resolve paths
@@ -180,6 +181,19 @@ def get_results(search: Optional[str] = None):
             or search_upper in r.get("name", "").upper()
         ]
     
+    # Inject SGPA and CGPA
+    for r in results:
+        subjects = r.get("subjects", {})
+        sems = list(set([s.get("semester", 0) for s in subjects.values()]))
+        latest_sem = max(sems) if sems else 0
+        r["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
+        r["cgpa"], _ = calculate_cgpa(subjects)
+        
+        r["sgpa_map"] = {}
+        for sem in sems:
+            sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+            r["sgpa_map"][sem] = sem_sgpa
+    
     return {
         "count": len(results),
         "results": results
@@ -192,6 +206,18 @@ def get_result(usn: str):
     result = get_result_by_usn(usn.upper())
     if not result:
         raise HTTPException(status_code=404, detail=f"No result found for USN: {usn}")
+        
+    subjects = result.get("subjects", {})
+    sems = list(set([s.get("semester", 0) for s in subjects.values()]))
+    latest_sem = max(sems) if sems else 0
+    result["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
+    result["cgpa"], _ = calculate_cgpa(subjects)
+    
+    result["sgpa_map"] = {}
+    for sem in sems:
+        sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+        result["sgpa_map"][sem] = sem_sgpa
+    
     return result
 
 

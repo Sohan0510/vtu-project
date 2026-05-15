@@ -285,6 +285,96 @@ body {
 }
 
 .hidden { display: none !important; }
+
+/* Leaderboard */
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+.leaderboard-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.leaderboard-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.15);
+}
+.rank-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.rank-badge.gold {
+  background: linear-gradient(135deg, #fcd34d, #f59e0b);
+  color: #78350f;
+  box-shadow: 0 4px 16px rgba(245,158,11,0.3);
+}
+.rank-badge.silver {
+  background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+  color: #1e293b;
+  box-shadow: 0 4px 16px rgba(148,163,184,0.3);
+}
+.rank-badge.bronze {
+  background: linear-gradient(135deg, #fca5a5, #ea580c);
+  color: #431407;
+  box-shadow: 0 4px 16px rgba(234,88,12,0.3);
+}
+.rank-badge.default {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.lb-info {
+  flex: 1;
+}
+.lb-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.lb-usn {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+}
+.lb-score {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+}
+.lb-cgpa {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--cyan);
+}
+.lb-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
 @media (max-width: 768px) {
   .header-content { flex-wrap: wrap; gap: 12px; }
   .nav { order: 3; width: 100%; }

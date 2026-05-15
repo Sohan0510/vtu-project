@@ -34,6 +34,10 @@ document.querySelector('#app').innerHTML = `
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           Find
         </button>
+        <button class="nav-btn" data-tab="leaderboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          Best
+        </button>
       </nav>
       <div class="stat-chip"><span class="stat-dot"></span><span id="stat-count">0</span> Students</div>
     </div>
@@ -158,7 +162,7 @@ document.querySelector('#app').innerHTML = `
           <p>Start a scraping job to see results here.</p>
         </div>
         <table class="results-table hidden" id="results-table">
-          <thead><tr><th>#</th><th>USN</th><th>Name</th><th>Subjects</th><th>Passed</th><th>Failed</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>USN</th><th>Name</th><th>Subjects</th><th>Passed</th><th>Failed</th><th>Total</th><th>SGPA</th><th>CGPA</th><th>Status</th><th></th></tr></thead>
           <tbody id="results-tbody"></tbody>
         </table>
       </div>
@@ -184,6 +188,17 @@ document.querySelector('#app').innerHTML = `
         <p id="find-error-msg">Student not found</p>
       </div>
     </section>
+
+    <!-- BEST / LEADERBOARD TAB -->
+    <section class="tab-content" id="tab-leaderboard">
+      <div class="section-header">
+        <h2 class="section-title">Top Performers</h2>
+        <p class="section-desc">The absolute best students ranked by their CGPA across all semesters.</p>
+      </div>
+      <div id="leaderboard-area">
+        <div class="leaderboard-grid" id="leaderboard-grid"></div>
+      </div>
+    </section>
   </main>
 `;
 
@@ -194,7 +209,11 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    if (btn.dataset.tab === 'results') loadAllResults();
+    if (btn.dataset.tab === 'results' || btn.dataset.tab === 'leaderboard') {
+      if (allResults.length === 0) loadAllResults();
+      else if (btn.dataset.tab === 'leaderboard') renderLeaderboard();
+      else renderResults(allResults);
+    }
   });
 });
 
@@ -353,9 +372,46 @@ async function loadAllResults() {
     const res = await fetch(`${API}/api/results`);
     const data = await res.json();
     allResults = data.results || [];
-    renderResults(allResults);
+    if (document.querySelector('[data-tab="results"]').classList.contains('active')) {
+      renderResults(allResults);
+    } else if (document.querySelector('[data-tab="leaderboard"]').classList.contains('active')) {
+      renderLeaderboard();
+    }
     updateStatCount();
   } catch (err) { console.error('Load results error:', err); }
+}
+
+function renderLeaderboard() {
+  const grid = document.getElementById('leaderboard-grid');
+  const sorted = [...allResults].filter(r => r.cgpa > 0).sort((a, b) => b.cgpa - a.cgpa);
+  
+  if (sorted.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><h3>No CGPA data available yet</h3></div>';
+    return;
+  }
+  
+  const top10 = sorted.slice(0, 10);
+  
+  grid.innerHTML = top10.map((r, i) => {
+    let rankClass = 'default';
+    if (i === 0) rankClass = 'gold';
+    else if (i === 1) rankClass = 'silver';
+    else if (i === 2) rankClass = 'bronze';
+    
+    return `
+      <div class="leaderboard-card" onclick="viewStudent('${r.usn}')">
+        <div class="rank-badge ${rankClass}">#${i+1}</div>
+        <div class="lb-info">
+          <div class="lb-name">${r.name || 'Unknown'}</div>
+          <div class="lb-usn">${r.usn}</div>
+        </div>
+        <div class="lb-score">
+          <span class="lb-cgpa">${r.cgpa.toFixed(2)}</span>
+          <span class="lb-label">CGPA</span>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderResults(results) {
@@ -385,6 +441,8 @@ function renderResults(results) {
       <td style="color:var(--green)">${passed}</td>
       <td style="color:${failed > 0 ? 'var(--red)' : 'var(--text-muted)'}">${failed}</td>
       <td style="font-weight:700">${r.grand_total || 0}</td>
+      <td style="font-weight:700; color:var(--purple)">${r.sgpa || '-'}</td>
+      <td style="font-weight:700; color:var(--cyan)">${r.cgpa || '-'}</td>
       <td class="${overall === 'PASS' ? 'status-pass' : 'status-fail'}">${overall}</td>
       <td><button class="btn-view" onclick="viewStudent('${r.usn}')">View</button></td>
     </tr>`;
@@ -542,7 +600,7 @@ function renderStudentCard(data, activeSem) {
       <div class="sem-section">
         <div class="sem-header">
           <span class="sem-badge">Semester ${sem}${hasReval ? ' <span class="reval-tag">REVAL</span>' : ''}</span>
-          <span class="sem-stats">${subs.length} subjects &middot; Total: ${semTotal} &middot; <span style="color:var(--green)">${semPassed}P</span>${semFailed > 0 ? ` <span style="color:var(--red)">${semFailed}F</span>` : ''}</span>
+          <span class="sem-stats">${subs.length} subjects &middot; Total: ${semTotal} &middot; <span style="color:var(--green)">${semPassed}P</span>${semFailed > 0 ? ` <span style="color:var(--red)">${semFailed}F</span>` : ''} &middot; <span style="color:var(--purple); font-weight:700;">SGPA: ${data.sgpa_map && data.sgpa_map[sem] !== undefined ? Number(data.sgpa_map[sem]).toFixed(2) : '-'}</span></span>
         </div>
         <table class="marks-table">
           <thead><tr>${headers}</tr></thead>
@@ -587,6 +645,14 @@ function renderStudentCard(data, activeSem) {
       <div class="student-info">
         <div class="student-name">${data.name || 'Unknown'}</div>
         <div class="student-usn">${data.usn} &middot; ${sortedSems.length} semester${sortedSems.length > 1 ? 's' : ''} on record</div>
+      </div>
+      <div class="student-total" style="padding: 10px 16px; border-radius: var(--radius-sm); background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2);">
+        <span class="total-number" style="color: var(--purple); font-size: 28px;">${data.sgpa || '-'}</span>
+        <span class="total-label" style="color: var(--purple)">Latest SGPA</span>
+      </div>
+      <div class="student-total" style="padding: 10px 16px; border-radius: var(--radius-sm); background: rgba(34, 211, 238, 0.08); border: 1px solid rgba(34, 211, 238, 0.2);">
+        <span class="total-number" style="color: var(--cyan); font-size: 28px;">${data.cgpa || '-'}</span>
+        <span class="total-label" style="color: var(--cyan)">CGPA</span>
       </div>
       <div class="student-total">
         <span class="total-number">${displayTotal}</span>
