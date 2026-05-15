@@ -499,7 +499,14 @@ def fetch_student_result(usn, url, max_retries=15):
             if not name_td:
                 page_text = post_response.text
                 if "not applied for reval" in page_text or "reval results are awaited" in page_text:
-                    return {"error": f"USN {usn} has not applied for reval or awaited."}
+                    return {
+                        "usn": usn,
+                        "name": "",
+                        "subjects": {},
+                        "grand_total": 0,
+                        "attempts": attempt,
+                        "reval_status": "Not Applied"
+                    }
                 if ("University Seat Number is not available" in page_text
                     or "not available or Invalid" in page_text
                     or "Invalid..!" in page_text):
@@ -507,13 +514,15 @@ def fetch_student_result(usn, url, max_retries=15):
                 continue
 
             student_name, subjects, grand_total = parse_result_page(result_soup)
+            is_reval_page = _is_reval_format(result_soup)
             
             return {
                 "usn": usn,
                 "name": student_name,
                 "subjects": subjects,
                 "grand_total": grand_total,
-                "attempts": attempt
+                "attempts": attempt,
+                "reval_status": "Applied" if is_reval_page else "Regular"
             }
 
         except requests.exceptions.Timeout:

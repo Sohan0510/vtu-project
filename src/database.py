@@ -69,6 +69,8 @@ def save_or_update_result(student_data, is_reval=False):
         
         collection.insert_one(student_data)
         sem_label = ", ".join(str(s) for s in semesters_found) if semesters_found else "?"
+        if student_data.get("reval_status") == "Not Applied":
+            return "not_applied", f"[-] Not applied for reval: {usn}"
         return "inserted", f"[+] New: {usn} ({new_name or '?'}) Sem {sem_label}"
 
     # ── EXISTING ENTRY ──
@@ -80,9 +82,13 @@ def save_or_update_result(student_data, is_reval=False):
     resolved_name = new_name if new_name else existing_name
 
     if is_reval:
+        if student_data.get("reval_status") == "Not Applied":
+            collection.update_one({"usn": usn}, {"$set": {"reval_status": "Not Applied", "last_updated": now}})
+            return "not_applied", f"[-] Not applied for reval: {usn}"
+            
         return _handle_reval_update(
             usn, resolved_name, new_subjects, old_subjects,
-            existing_record, old_url_sources, new_url, now
+            existing_record, old_url_sources, new_url, now, student_data.get("reval_status")
         )
     else:
         return _handle_normal_merge(
@@ -92,7 +98,7 @@ def save_or_update_result(student_data, is_reval=False):
 
 
 def _handle_reval_update(usn, name, new_subjects, old_subjects,
-                          existing_record, old_url_sources, new_url, now):
+                          existing_record, old_url_sources, new_url, now, reval_status):
     """Revaluation: compare per-subject, only update if marks improved."""
     merged_subjects = dict(old_subjects)
     updates_made = []
@@ -136,18 +142,21 @@ def _handle_reval_update(usn, name, new_subjects, old_subjects,
                 "semesters": semesters,
                 "last_updated": now,
                 "url_sources": url_sources,
-                "name": name
+                "name": name,
+                "reval_status": reval_status
             },
             "$push": {"reval_changes": reval_log}}
         )
         return "updated", f"[^] Reval {usn}: {len(updates_made)} subjects updated"
     else:
-        # Even though marks unchanged, still update name if it was missing
+        # Update name and reval_status even if marks are unchanged
+        update_fields = {"last_updated": now}
         if name and name != existing_record.get("name", "").strip():
-            collection.update_one(
-                {"usn": usn},
-                {"$set": {"name": name, "last_updated": now}}
-            )
+            update_fields["name"] = name
+        if reval_status:
+            update_fields["reval_status"] = reval_status
+            
+        collection.update_one({"usn": usn}, {"$set": update_fields})
         return "unchanged", f"[-] No improvement for {usn}"
 
 
