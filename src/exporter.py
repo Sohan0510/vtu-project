@@ -258,7 +258,7 @@ def export_to_excel(results, prefix="results"):
     
     detail_headers = [
         "Sl.", "USN", "Student Name", "Sem", "Subject Code",
-        "Subject Name", "Internal", "External", "Total", "Result"
+        "Subject Name", "Internal", "Old Ext", "New Ext", "Total", "Result"
     ]
     
     for col, header in enumerate(detail_headers, 1):
@@ -286,9 +286,11 @@ def export_to_excel(results, prefix="results"):
         for sem in sorted(sem_groups.keys()):
             for sub_code, sub in sorted(sem_groups[sem], key=lambda x: x[0]):
                 is_reval = sub.get("reval_updated", False)
+                old_ext = sub.get("old_marks", "-")
+                new_ext = sub.get("externals", 0)
                 row_data = [
                     sl_no, usn, name, sem, sub_code, sub.get("name", ""),
-                    sub.get("internals", 0), sub.get("externals", 0),
+                    sub.get("internals", 0), old_ext, new_ext,
                     sub.get("total", 0), sub.get("status", "")
                 ]
                 
@@ -299,7 +301,7 @@ def export_to_excel(results, prefix="results"):
                     
                     if col == 2:
                         cell.font = Font(name='Consolas', size=10)
-                    elif col == 10:
+                    elif col == 11:
                         if value == 'P':
                             cell.fill = PASS_FILL
                         elif value in ('F', 'A'):
@@ -311,13 +313,13 @@ def export_to_excel(results, prefix="results"):
                 sl_no += 1
                 row_num += 1
     
-    detail_widths = [6, 15, 25, 6, 14, 42, 10, 10, 8, 8]
+    detail_widths = [6, 15, 25, 6, 14, 40, 10, 10, 10, 8, 8]
     for i, width in enumerate(detail_widths, 1):
         ws_detail.column_dimensions[get_column_letter(i)].width = width
     
     ws_detail.freeze_panes = 'A4'
     if row_num > 4:
-        ws_detail.auto_filter.ref = f"A3:J{row_num - 1}"
+        ws_detail.auto_filter.ref = f"A3:K{row_num - 1}"
     
     # ══════════════════════════════════════════
     # PER-SEMESTER SHEETS
@@ -343,7 +345,7 @@ def export_to_excel(results, prefix="results"):
         
         sem_headers = [
             "Sl.", "USN", "Student Name", "Subject Code",
-            "Subject Name", "Internal", "External", "Total", "Result"
+            "Subject Name", "Internal", "Old Ext", "New Ext", "Total", "Result"
         ]
         for col, header in enumerate(sem_headers, 1):
             ws_sem.cell(row=3, column=col, value=header)
@@ -368,9 +370,11 @@ def export_to_excel(results, prefix="results"):
             for sub_code in sorted(sem_subs.keys()):
                 sub = sem_subs[sub_code]
                 is_reval = sub.get("reval_updated", False)
+                old_ext = sub.get("old_marks", "-")
+                new_ext = sub.get("externals", 0)
                 row_data = [
                     sl_no, usn, name, sub_code, sub.get("name", ""),
-                    sub.get("internals", 0), sub.get("externals", 0),
+                    sub.get("internals", 0), old_ext, new_ext,
                     sub.get("total", 0), sub.get("status", "")
                 ]
                 
@@ -381,7 +385,7 @@ def export_to_excel(results, prefix="results"):
                     
                     if col == 2:
                         cell.font = Font(name='Consolas', size=10)
-                    elif col == 9:
+                    elif col == 10:
                         if value == 'P':
                             cell.fill = PASS_FILL
                         elif value in ('F', 'A'):
@@ -417,17 +421,17 @@ def export_to_excel(results, prefix="results"):
         stats_cell = ws_sem.cell(row=row_num, column=1, value=f"Sem {sem}: {len(sem_students)} students | {sem_pass} passed | {sem_fail} failed | {round(sem_pass/max(len(sem_students),1)*100,1)}% pass rate")
         stats_cell.font = STATS_FONT
         stats_cell.fill = STATS_FILL
-        for col in range(1, 10):
+        for col in range(1, 11):
             ws_sem.cell(row=row_num, column=col).border = THIN_BORDER
             ws_sem.cell(row=row_num, column=col).fill = STATS_FILL
         
-        sem_widths = [6, 15, 25, 14, 45, 10, 10, 8, 8]
+        sem_widths = [6, 15, 25, 14, 40, 10, 10, 10, 8, 8]
         for i, width in enumerate(sem_widths, 1):
             ws_sem.column_dimensions[get_column_letter(i)].width = width
         
         ws_sem.freeze_panes = 'A4'
         if row_num > 4:
-            ws_sem.auto_filter.ref = f"A3:I{row_num - 1}"
+            ws_sem.auto_filter.ref = f"A3:J{row_num - 1}"
     
     # ══════════════════════════════════════════
     # ANALYTICS SHEET
