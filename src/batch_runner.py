@@ -67,6 +67,9 @@ def _process_single_usn(usn, url, is_reval, max_retries):
         if "not found" in error_msg.lower():
             print(f"   [!] {usn}: Not found / no results")
             return "not_found", None
+        elif "not applied for reval" in error_msg.lower():
+            print(f"   [!] {usn}: Not applied for reval")
+            return "not_found", None
         else:
             print(f"   [X] {usn}: {error_msg}")
             return "failed", None

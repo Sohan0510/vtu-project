@@ -57,39 +57,68 @@ def _parse_student_name(soup):
       - Div-based info sections
       - Table-based info sections
     """
+    def clean_name(n):
+        n = n.lstrip(':').strip()
+        # If it accidentally captured the next label, clean it up
+        for invalid_word in ['Semester', 'Father', 'Mother', 'USN']:
+            if invalid_word.lower() in n.lower():
+                n = n[:n.lower().index(invalid_word.lower())].strip()
+                n = n.rstrip(':').strip()
+        return n
+
     # Method 1: Standard td-based lookup
     name_td = soup.find(
         lambda tag: tag.name == 'td' and 'Student Name' in tag.get_text()
     )
     if name_td:
+        # Check if name is within the same td: <td>Student Name : JOHN DOE</td>
+        text = name_td.get_text(separator=' ', strip=True)
+        if ':' in text:
+            parts = text.split(':', 1)
+            if len(parts) > 1 and parts[1].strip():
+                name = clean_name(parts[1])
+                if name: return name
+
+        # Look at the next sibling td
         name_value_td = name_td.find_next_sibling('td')
         if name_value_td:
-            raw_name = name_value_td.get_text(strip=True)
-            name = raw_name.lstrip(':').strip()
-            if name:
-                return name
-    
-    # Method 2: Look for td with ':' prefix pattern near "Student Name" text
+            name = clean_name(name_value_td.get_text(separator=' ', strip=True))
+            if name: return name
+
+    # Method 2: Look for td with pattern near "Student Name" text
     all_tds = soup.find_all('td')
     for i, td in enumerate(all_tds):
-        text = td.get_text(strip=True)
+        text = td.get_text(separator=' ', strip=True)
         if 'student name' in text.lower():
+            if ':' in text:
+                parts = text.split(':', 1)
+                if len(parts) > 1 and parts[1].strip():
+                    name = clean_name(parts[1])
+                    if name: return name
+            
             # Check next td
             if i + 1 < len(all_tds):
-                raw = all_tds[i + 1].get_text(strip=True)
-                name = raw.lstrip(':').strip()
-                if name:
-                    return name
+                name = clean_name(all_tds[i + 1].get_text(separator=' ', strip=True))
+                if name: return name
     
-    # Method 3: Search entire page for "Student Name" followed by ":"
-    page_text = soup.get_text()
+    # Method 3: Search entire page text
+    page_text = soup.get_text(separator='  ', strip=True)
     import re
-    match = re.search(r'Student\s*Name\s*[:\-]\s*(.+?)(?:\n|$)', page_text)
+    match = re.search(r'Student\s*Name\s*[:\-]\s*(.+?)(?:\s\s|$)', page_text)
     if match:
-        name = match.group(1).strip()
-        if name:
-            return name
-    
+        name = clean_name(match.group(1))
+        if name: return name
+        
+    # Method 4: Div-based layout lookup
+    # VTU sometimes uses divs for the student info table
+    divs = soup.find_all('div')
+    for i, div in enumerate(divs):
+        text = div.get_text(separator=' ', strip=True)
+        if text.lower() == 'student name' or text.lower() == 'student name :':
+            if i + 1 < len(divs):
+                name = clean_name(divs[i + 1].get_text(separator=' ', strip=True))
+                if name: return name
+
     return ""
 
 
@@ -469,6 +498,8 @@ def fetch_student_result(usn, url, max_retries=15):
             
             if not name_td:
                 page_text = post_response.text
+                if "not applied for reval" in page_text or "reval results are awaited" in page_text:
+                    return {"error": f"USN {usn} has not applied for reval or awaited."}
                 if ("University Seat Number is not available" in page_text
                     or "not available or Invalid" in page_text
                     or "Invalid..!" in page_text):
