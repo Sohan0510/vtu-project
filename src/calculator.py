@@ -41,7 +41,7 @@ SUBJECT_CREDITS = {
     "BYOK459": 0,
     
     # 5th Semester Core
-    "BCS501": 4,
+    "BCS501": 3,
     "BCS502": 4,
     "BCS503": 4,
     "BCSL504": 1,
