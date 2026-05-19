@@ -47,7 +47,7 @@ SUBJECT_CREDITS = {
     "BCSL504": 1,
     "BCS586": 2,
     "BRMK557": 3,
-    "BCS508": 1,
+    "BCS508": 2,
     
     # 5th Semester Electives
     "BCS515": 3,  # Base code for all BCS515x
