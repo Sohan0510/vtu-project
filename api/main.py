@@ -87,6 +87,14 @@ def serve_frontend():
             return HTMLResponse(content=f.read())
     return HTMLResponse(content="<h1>Frontend not found. Place index.html in /static/</h1>")
 
+@app.get("/admin", response_class=HTMLResponse)
+def serve_admin():
+    """Serve the admin frontend page."""
+    admin_path = os.path.join(STATIC_DIR, "admin", "index.html")
+    if os.path.exists(admin_path):
+        with open(admin_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Admin Frontend not found.</h1>")
 
 # -- API Routes --
 
