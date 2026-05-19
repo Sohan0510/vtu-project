@@ -593,8 +593,8 @@ function renderStudentCard(data, activeSem) {
     const hasReval = subs.some(s => s.old_marks !== undefined || s.rv_marks !== undefined);
 
     const headers = hasReval
-      ? '<th>Code</th><th>Subject Name</th><th>Internal</th><th>Old Total</th><th>RV Total</th><th>New Total</th><th>Result</th>'
-      : '<th>Code</th><th>Subject Name</th><th>Internal</th><th>External</th><th>Total</th><th>Result</th>';
+      ? '<th>Code</th><th>Subject Name</th><th>Cr.</th><th>Internal</th><th>Old Total</th><th>RV Total</th><th>New Total</th><th>Result</th>'
+      : '<th>Code</th><th>Subject Name</th><th>Cr.</th><th>Internal</th><th>External</th><th>Total</th><th>Result</th>';
 
     return `
       <div class="sem-section">
@@ -614,6 +614,7 @@ function renderStudentCard(data, activeSem) {
                 <tr${improved ? ' class="reval-improved"' : ''}>
                   <td style="font-family:'Courier New',monospace;font-weight:600">${s.code}</td>
                   <td>${s.name}</td>
+                  <td style="font-weight:600; text-align:center">${s.credits}</td>
                   <td>${s.internals}</td>
                   <td style="color:var(--text-muted)">${oldTotal}</td>
                   <td style="color:var(--cyan)">${rvTotal}</td>
@@ -625,6 +626,7 @@ function renderStudentCard(data, activeSem) {
               <tr>
                 <td style="font-family:'Courier New',monospace;font-weight:600">${s.code}</td>
                 <td>${s.name}</td>
+                <td style="font-weight:600; text-align:center">${s.credits}</td>
                 <td>${s.internals}</td>
                 <td>${s.externals}</td>
                 <td style="font-weight:700">${s.total}</td>

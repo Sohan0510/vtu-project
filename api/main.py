@@ -26,7 +26,7 @@ from src.database import (
     get_results_by_usn_range
 )
 from src.exporter import export_to_excel
-from src.calculator import calculate_sgpa, calculate_cgpa
+from src.calculator import calculate_sgpa, calculate_cgpa, get_credits
 from src.config import EXPORTS_DIR
 
 # Resolve paths
@@ -192,6 +192,9 @@ def get_results(search: Optional[str] = None):
     # Inject SGPA and CGPA
     for r in results:
         subjects = r.get("subjects", {})
+        for code, sub in subjects.items():
+            sub["credits"] = get_credits(code)
+            
         sems = list(set([s.get("semester", 0) for s in subjects.values()]))
         latest_sem = max(sems) if sems else 0
         r["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
@@ -216,6 +219,9 @@ def get_result(usn: str):
         raise HTTPException(status_code=404, detail=f"No result found for USN: {usn}")
         
     subjects = result.get("subjects", {})
+    for code, sub in subjects.items():
+        sub["credits"] = get_credits(code)
+        
     sems = list(set([s.get("semester", 0) for s in subjects.values()]))
     latest_sem = max(sems) if sems else 0
     result["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)

@@ -148,6 +148,7 @@ function renderStudent(activeSem) {
               <tr>
                 <th>Code</th>
                 <th>Subject</th>
+                <th>Cr.</th>
                 <th>INT</th>
                 <th>EXT</th>
                 <th>Total</th>
@@ -159,6 +160,7 @@ function renderStudent(activeSem) {
                 <tr>
                   <td class="subject-code">${s.code}</td>
                   <td class="subject-name">${s.name}</td>
+                  <td class="mark-val">${s.credits}</td>
                   <td class="mark-val">${s.internals}</td>
                   <td class="mark-val">${s.externals}</td>
                   <td class="mark-total">${s.total}</td>
