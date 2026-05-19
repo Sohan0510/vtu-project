@@ -18,7 +18,7 @@ services:
     volumes:
       - ./exports:/app/exports
     environment:
-      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_URI=mongodb+srv://5223346sohansridattaa_db_user:eCFXJ0aq7RiD6IHk@cluster0.ccgnozo.mongodb.net/?appName=Cluster0
       - TESSERACT_PATH=/usr/bin/tesseract
     depends_on:
       - mongodb
