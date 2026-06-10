@@ -32,7 +32,13 @@ This project is completely **Dockerized**. This means everything (the database, 
 ### Step 1: Open your terminal
 Open a terminal (Command Prompt, PowerShell, or macOS/Linux Terminal) in the root folder of this project.
 
-### Step 2: Start the application
+### Step 2: Configure Environment Variables
+Copy the `.env.example` file and rename it to `.env`. Fill in your MongoDB connection string inside the `.env` file:
+```bash
+cp .env.example .env
+```
+
+### Step 3: Start the application
 Run the following command:
 
 ```bash
