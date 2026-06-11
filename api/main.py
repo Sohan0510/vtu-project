@@ -176,41 +176,6 @@ def get_status(job_id: str):
     }
 
 
-@app.get("/api/results")
-def get_results(search: Optional[str] = None):
-    """Get all results. Optional search by USN or name."""
-    results = get_all_results()
-    
-    if search:
-        search_upper = search.upper()
-        results = [
-            r for r in results
-            if search_upper in r.get("usn", "").upper()
-            or search_upper in r.get("name", "").upper()
-        ]
-    
-    # Inject SGPA and CGPA
-    for r in results:
-        subjects = r.get("subjects", {})
-        for code, sub in subjects.items():
-            sub["credits"] = get_credits(code)
-            
-        sems = list(set([s.get("semester", 0) for s in subjects.values()]))
-        latest_sem = max(sems) if sems else 0
-        r["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
-        r["cgpa"], _ = calculate_cgpa(subjects)
-        
-        r["sgpa_map"] = {}
-        for sem in sems:
-            sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
-            r["sgpa_map"][sem] = sem_sgpa
-    
-    return {
-        "count": len(results),
-        "results": results
-    }
-
-
 @app.get("/api/results/{usn}")
 def get_result(usn: str):
     """Get a single student's result by USN."""
