@@ -41,13 +41,13 @@ SUBJECT_CREDITS = {
     "BYOK459": 0,
     
     # 5th Semester Core
-    "BCS501": 3,
+    "BCS501": 4,
     "BCS502": 4,
     "BCS503": 4,
     "BCSL504": 1,
     "BCS586": 2,
     "BRMK557": 3,
-    "BCS508": 2,
+    "BCS508": 1,
     
     # 5th Semester Electives
     "BCS515": 3,  # Base code for all BCS515x
