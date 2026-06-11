@@ -53,15 +53,6 @@ A full-stack tool to **automatically scrape, store, and export** student exam re
 | `exporter.py`     | Generates multi-sheet Excel reports with formatting, color-coded pass/fail, topper highlighting, and subject-wise analytics.     |
 | `config.py`       | Loads environment variables and sets up directory paths.                                                                         |
 
-### Frontend (`frontend/`)
-
-| Page                           | Description                                                                                                                               |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Student Portal** (`/`)       | Public-facing search page — students enter their USN to view marks, SGPA, and CGPA with semester-wise breakdown.                          |
-| **Admin Dashboard** (`/urmom`) | Admin panel with 4 tabs: **Scrape** (start jobs), **Results** (view all students), **Find** (search by USN), **Best** (CGPA leaderboard). |
-
-Built with **Vanilla JS + Vite**, styled with custom CSS, and served via **Nginx** in production. The Nginx config reverse-proxies `/api/` requests to the backend.
-
 ---
 
 ## 🛠️ Prerequisites
