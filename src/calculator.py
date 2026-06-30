@@ -56,6 +56,22 @@ SUBJECT_CREDITS = {
     "BNSK559": 0,
     "BPEK559": 0,
     "BYOK559": 0,
+
+    "BCS601":4,
+    "BCS602":4,
+    "BCS613A":3,
+    "BCS613B":3,
+    "BCS613C":3,
+    "BCS613D":3,
+    "BME654B":3,
+    "BCS685":2,
+    "BCSL606":1,
+    "BAIL657C":1,
+
+    "BNSK659": 0,
+    "BPEK659": 0,
+    "BYOK659": 0,
+
 }
 
 def get_credits(subject_code):
