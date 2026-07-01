@@ -199,6 +199,32 @@ def get_result(usn: str):
     return result
 
 
+@app.get("/api/results")
+def get_all_results_endpoint():
+    """Get all student results with computed SGPA and CGPA."""
+    results = get_all_results()
+    if not results:
+        return {"results": []}
+    
+    for result in results:
+        subjects = result.get("subjects", {})
+        for code, sub in subjects.items():
+            sub["credits"] = get_credits(code)
+            
+        sems = list(set([s.get("semester", 0) for s in subjects.values()]))
+        latest_sem = max(sems) if sems else 0
+        result["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
+        result["cgpa"], _ = calculate_cgpa(subjects)
+        
+        result["sgpa_map"] = {}
+        for sem in sems:
+            sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+            result["sgpa_map"][sem] = sem_sgpa
+            
+    return {"results": results}
+
+
+
 @app.get("/api/export")
 def export_all(semester: Optional[int] = None):
     """Export all DB results to Excel. Optional semester filter."""
