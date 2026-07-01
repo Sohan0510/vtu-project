@@ -15,15 +15,14 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 
 import urllib3
 urllib3.disable_warnings()
 
 from src.batch_runner import generate_usns, run_batch_and_export
 from src.database import (
-    get_all_results, get_result_by_usn, get_results_count,
-    get_results_by_usn_range
+    get_all_results, get_result_by_usn, get_results_count
 )
 from src.exporter import export_to_excel
 from src.calculator import calculate_sgpa, calculate_cgpa, get_credits

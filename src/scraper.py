@@ -66,6 +66,18 @@ def _parse_student_name(soup):
                 n = n.rstrip(':').strip()
         return n
 
+    # Method 0: New VTU divTableCell-based lookup (2026+ format)
+    # Student info is in divTableBody -> divTableRow -> divTableCell pairs
+    name_cells = soup.find_all('div', class_='divTableCell')
+    for i, cell in enumerate(name_cells):
+        cell_text = cell.get_text(strip=True)
+        if cell_text == 'Student Name':
+            # The name value should be the next sibling divTableCell
+            next_cell = cell.find_next_sibling('div', class_='divTableCell')
+            if next_cell:
+                name = clean_name(next_cell.get_text(strip=True))
+                if name: return name
+
     # Method 1: Standard td-based lookup
     name_td = soup.find(
         lambda tag: tag.name == 'td' and 'Student Name' in tag.get_text()
@@ -142,7 +154,8 @@ def _is_reval_format(soup):
 def _parse_regular_divtable(soup):
     """
     Parses regular VTU results using CSS div-based tables.
-    Columns (6): Subject Code, Subject Name, Internal, External, Total, Result
+    Uses header-based column mapping so it adapts to any number of columns.
+    Supports both old 6-col format and new 7-col format (with 'Announced / Updated on').
     """
     subjects = {}
     grand_total = 0
@@ -152,23 +165,53 @@ def _parse_regular_divtable(soup):
     for table_body in table_bodies:
         rows = table_body.find_all('div', class_='divTableRow')
         
-        for row in rows:
-            style = row.get('style', '')
-            if 'font-weight' in style and 'bold' in style:
-                continue
-            
+        # Try to find a header row to build a column map
+        header_row_idx = -1
+        col_map = {}
+        
+        for idx, row in enumerate(rows):
             cells = row.find_all('div', class_='divTableCell')
-            
-            if len(cells) >= 6:
-                sub_code = cells[0].get_text(strip=True)
-                sub_name = cells[1].get_text(strip=True)
-                internals_text = cells[2].get_text(strip=True)
-                externals_text = cells[3].get_text(strip=True)
-                total_text = cells[4].get_text(strip=True)
-                result_status = cells[5].get_text(strip=True)
-                
-                if not sub_code or sub_code == 'Subject Code':
+            row_texts = [c.get_text(strip=True).lower() for c in cells]
+            if any('subject code' in t for t in row_texts):
+                for i, h in enumerate(row_texts):
+                    if 'subject code' in h:
+                        col_map['code'] = i
+                    elif 'subject name' in h:
+                        col_map['name'] = i
+                    elif 'internal' in h:
+                        col_map['internal'] = i
+                    elif 'external' in h:
+                        col_map['external'] = i
+                    elif h == 'total':
+                        col_map['total'] = i
+                    elif h == 'result':
+                        col_map['result'] = i
+                header_row_idx = idx
+                break
+        
+        # If we found a header row, parse data rows using the column map
+        if header_row_idx != -1 and 'code' in col_map:
+            data_rows = rows[header_row_idx + 1:]
+            for row in data_rows:
+                cells = row.find_all('div', class_='divTableCell')
+                if len(cells) < 3:
                     continue
+                
+                def _cell(key):
+                    idx = col_map.get(key)
+                    if idx is not None and idx < len(cells):
+                        return cells[idx].get_text(strip=True)
+                    return ''
+                
+                sub_code = _cell('code')
+                if not sub_code or sub_code.lower() == 'subject code' or '->' in sub_code:
+                    continue
+                
+                sub_name = _cell('name')
+                internals_text = _cell('internal')
+                externals_text = _cell('external')
+                total_text = _cell('total')
+                result_status = _cell('result')
                 
                 internals = int(internals_text) if internals_text.isdigit() else 0
                 externals = int(externals_text) if externals_text.isdigit() else 0
@@ -183,6 +226,39 @@ def _parse_regular_divtable(soup):
                     "semester": _extract_semester(sub_code)
                 }
                 grand_total += total
+        else:
+            # Fallback: no header found, try positional parsing (old 6-col format)
+            for row in rows:
+                style = row.get('style', '')
+                if 'font-weight' in style and 'bold' in style:
+                    continue
+                
+                cells = row.find_all('div', class_='divTableCell')
+                
+                if len(cells) >= 6:
+                    sub_code = cells[0].get_text(strip=True)
+                    sub_name = cells[1].get_text(strip=True)
+                    internals_text = cells[2].get_text(strip=True)
+                    externals_text = cells[3].get_text(strip=True)
+                    total_text = cells[4].get_text(strip=True)
+                    result_status = cells[5].get_text(strip=True)
+                    
+                    if not sub_code or sub_code == 'Subject Code' or '->' in sub_code:
+                        continue
+                    
+                    internals = int(internals_text) if internals_text.isdigit() else 0
+                    externals = int(externals_text) if externals_text.isdigit() else 0
+                    total = int(total_text) if total_text.isdigit() else 0
+                    
+                    subjects[sub_code] = {
+                        "name": sub_name,
+                        "internals": internals,
+                        "externals": externals,
+                        "total": total,
+                        "status": result_status,
+                        "semester": _extract_semester(sub_code)
+                    }
+                    grand_total += total
 
     return subjects, grand_total
 
@@ -249,7 +325,7 @@ def _parse_reval_divtable(soup):
                 return ''
 
             sub_code = _cell('code')
-            if not sub_code or sub_code.lower() == 'subject code':
+            if not sub_code or sub_code.lower() == 'subject code' or '->' in sub_code:
                 continue
 
             sub_name = _cell('name')
@@ -372,7 +448,7 @@ def _parse_reval_table(soup):
                 return ''
             
             sub_code = _cell('code')
-            if not sub_code or sub_code.lower() == 'subject code':
+            if not sub_code or sub_code.lower() == 'subject code' or '->' in sub_code:
                 continue
             
             sub_name = _cell('name')
@@ -492,11 +568,16 @@ def fetch_student_result(usn, url, max_retries=15):
             post_response = session.post(result_url, data=payload, verify=False, timeout=15)
             result_soup = BeautifulSoup(post_response.text, 'html.parser')
 
+            # Check for student name in <td> (old format) or <div> (new format)
             name_td = result_soup.find(
                 lambda tag: tag.name == 'td' and 'Student Name' in tag.get_text()
             )
+            name_div = result_soup.find(
+                lambda tag: tag.name == 'div' and tag.get('class') and 'divTableCell' in tag.get('class', []) and 'Student Name' in tag.get_text() and len(tag.get_text()) < 50
+            )
+            has_student_info = name_td or name_div
             
-            if not name_td:
+            if not has_student_info:
                 page_text = post_response.text
                 if "not applied for reval" in page_text or "reval results are awaited" in page_text:
                     return {
