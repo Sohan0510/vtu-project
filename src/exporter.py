@@ -13,7 +13,7 @@ Sheets:
 import os
 from datetime import datetime
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side, numbers
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 from src.config import EXPORTS_DIR
 from src.calculator import calculate_sgpa, calculate_cgpa
@@ -143,6 +143,7 @@ def export_to_excel(results, prefix="results"):
     fail_count = 0
     total_marks_all = 0
     max_total = 0
+    best_cgpa = 0
     topper_row = 5
     
     for sl, student in enumerate(sorted_results, 1):
@@ -162,9 +163,11 @@ def export_to_excel(results, prefix="results"):
         failed = sum(1 for s in subjects.values() if s.get("status") in ("F", "A"))
         overall = "PASS" if failed == 0 and total_subs > 0 else "FAIL"
         
-        # Calculate percentage (assuming max 100 per subject)
+        # Calculate percentage: grand_total / (num_subjects * 100) * 100
         max_marks = total_subs * 100 if total_subs > 0 else 1
         percentage = round((grand_total / max_marks) * 100, 1) if max_marks > 0 else 0
+        # Cap at 100% in case of rare edge cases
+        percentage = min(percentage, 100.0)
         
         # Check for reval updates
         has_reval = any(s.get("reval_updated") for s in subjects.values())
@@ -175,15 +178,18 @@ def export_to_excel(results, prefix="results"):
         else:
             fail_count += 1
         total_marks_all += grand_total
-        
         if grand_total > max_total:
             max_total = grand_total
-            topper_row = row_num
         
         # Calculate SGPA and CGPA
         latest_sem = max(sems) if sems else 0
         sgpa, _ = calculate_sgpa(subjects, target_sem=latest_sem)
         cgpa, _ = calculate_cgpa(subjects)
+        
+        # Track topper by CGPA (fair across different semester counts)
+        if cgpa > best_cgpa:
+            best_cgpa = cgpa
+            topper_row = row_num
         
         row_data = [sl, usn, name, sems_str, total_subs, passed, failed,
                      grand_total, percentage, sgpa, cgpa, overall, reval_text]
@@ -209,8 +215,8 @@ def export_to_excel(results, prefix="results"):
         
         row_num += 1
     
-    # Highlight topper row
-    if max_total > 0:
+    # Highlight topper row (by CGPA)
+    if best_cgpa > 0:
         for col in range(1, len(summary_headers) + 1):
             cell = ws_summary.cell(row=topper_row, column=col)
             cell.fill = TOPPER_FILL
@@ -282,6 +288,7 @@ def export_to_excel(results, prefix="results"):
         if not subjects:
             continue
         
+        # Step 1: Group all subjects by semester
         sem_groups = {}
         for sub_code, sub in subjects.items():
             sem = sub.get("semester") or _get_semester(sub_code)
@@ -289,20 +296,23 @@ def export_to_excel(results, prefix="results"):
                 sem_groups[sem] = []
             sem_groups[sem].append((sub_code, sub))
         
-            cgpa, _ = calculate_cgpa(subjects)
-            for sem in sorted(sem_groups.keys()):
-                sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
-                for sub_code, sub in sorted(sem_groups[sem], key=lambda x: x[0]):
-                    is_reval = sub.get("reval_updated", False)
-                    old_ext = sub.get("old_marks", "-")
-                    new_ext = sub.get("externals", 0)
-                    reval_status = student.get("reval_status", "-")
-                    row_data = [
-                        sl_no, usn, name, sem, sub_code, sub.get("name", ""),
-                        sub.get("internals", 0), old_ext, new_ext,
-                        sub.get("total", 0), sub.get("status", ""), reval_status,
-                        sem_sgpa, cgpa
-                    ]
+        # Step 2: Calculate CGPA once per student
+        cgpa, _ = calculate_cgpa(subjects)
+        
+        # Step 3: Iterate semesters in order, then subjects in order
+        for sem in sorted(sem_groups.keys()):
+            sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+            for sub_code, sub in sorted(sem_groups[sem], key=lambda x: x[0]):
+                is_reval = sub.get("reval_updated", False)
+                old_ext = sub.get("old_marks", "-")
+                new_ext = sub.get("externals", 0)
+                reval_status = student.get("reval_status", "-")
+                row_data = [
+                    sl_no, usn, name, sem, sub_code, sub.get("name", ""),
+                    sub.get("internals", 0), old_ext, new_ext,
+                    sub.get("total", 0), sub.get("status", ""), reval_status,
+                    sem_sgpa, cgpa
+                ]
                 
                 for col, value in enumerate(row_data, 1):
                     cell = ws_detail.cell(row=row_num, column=col, value=value)
@@ -432,7 +442,8 @@ def export_to_excel(results, prefix="results"):
                     sem_pass += 1
         
         row_num += 1
-        ws_sem.merge_cells(f'A{row_num}:C{row_num}')
+        last_col_letter = get_column_letter(len(sem_headers))
+        ws_sem.merge_cells(f'A{row_num}:{last_col_letter}{row_num}')
         stats_cell = ws_sem.cell(row=row_num, column=1, value=f"Sem {sem}: {len(sem_students)} students | {sem_pass} passed | {sem_fail} failed | {round(sem_pass/max(len(sem_students),1)*100,1)}% pass rate")
         stats_cell.font = STATS_FONT
         stats_cell.fill = STATS_FILL
@@ -467,7 +478,7 @@ def export_to_excel(results, prefix="results"):
             if code not in subject_stats:
                 subject_stats[code] = {
                     "name": sub.get("name", ""),
-                    "semester": sub.get("semester", 0),
+                    "semester": sub.get("semester") or _get_semester(code),
                     "total_students": 0,
                     "passed": 0,
                     "failed": 0,
@@ -488,14 +499,20 @@ def export_to_excel(results, prefix="results"):
             else:
                 stats["failed"] += 1
     
-    analytics_headers = ["Subject Code", "Subject Name", "Sem", "Students", 
-                          "Pass %", "Avg Marks", "Max", "Min"]
+    analytics_headers = ["Subject Code", "Subject Name", "Sem", "Students",
+                          "Passed", "Failed", "Pass %", "Avg Marks", "Max", "Min"]
     for col, header in enumerate(analytics_headers, 1):
         ws_analytics.cell(row=3, column=col, value=header)
     _apply_header_style(ws_analytics, 3, len(analytics_headers))
     
+    # Sort subjects by semester then by code for clean grouping
+    sorted_subject_codes = sorted(
+        subject_stats.keys(),
+        key=lambda c: (subject_stats[c]["semester"], c)
+    )
+    
     row_num = 4
-    for code in sorted(subject_stats.keys()):
+    for code in sorted_subject_codes:
         stats = subject_stats[code]
         n = stats["total_students"]
         pass_pct = round(stats["passed"] / max(n, 1) * 100, 1)
@@ -503,6 +520,7 @@ def export_to_excel(results, prefix="results"):
         
         row_data = [
             code, stats["name"], stats["semester"], n,
+            stats["passed"], stats["failed"],
             pass_pct, avg, stats["max_marks"],
             stats["min_marks"] if stats["min_marks"] < 999 else 0
         ]
@@ -514,7 +532,12 @@ def export_to_excel(results, prefix="results"):
             
             if col == 1:
                 cell.font = Font(name='Consolas', size=10, bold=True)
-            elif col == 5:  # Pass %
+            elif col == 5:  # Passed count
+                cell.font = Font(name='Calibri', size=10, color='006100')
+            elif col == 6:  # Failed count
+                if value > 0:
+                    cell.font = Font(name='Calibri', size=10, color='9C0006')
+            elif col == 7:  # Pass %
                 if value >= 80:
                     cell.fill = PASS_FILL
                 elif value < 50:
@@ -523,13 +546,13 @@ def export_to_excel(results, prefix="results"):
         
         row_num += 1
     
-    analytics_widths = [14, 45, 6, 10, 10, 10, 8, 8]
+    analytics_widths = [14, 45, 6, 10, 9, 9, 10, 10, 8, 8]
     for i, width in enumerate(analytics_widths, 1):
         ws_analytics.column_dimensions[get_column_letter(i)].width = width
     
     ws_analytics.freeze_panes = 'A4'
     if row_num > 4:
-        ws_analytics.auto_filter.ref = f"A3:H{row_num - 1}"
+        ws_analytics.auto_filter.ref = f"A3:J{row_num - 1}"
     
     # ── SAVE ──
     wb.save(filepath)
