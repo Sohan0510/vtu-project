@@ -936,7 +936,7 @@ function showLoginModal() {
     
     // Compare against pre-hashed credentials (mdadmin / placement123)
     if (idHash === 'd9dc51915ea0c76fb57eb5c5c720c941589548f4a1fd46d195d3d4da471dfb69' && 
-        pwHash === '2a491a2a2a4c72fb484db9932f9dcb056da9fe3001324660d216fc242947cd5c') {
+        pwHash === '161dad5feafc5f15e0b71cd7cb868309ef0614240fe0e209f192c606c5fb5aec') {
       isAdmin = true;
       hideEventModal();
       render(); // Re-render calendar page to update grid interactivity and toolbar logout button
