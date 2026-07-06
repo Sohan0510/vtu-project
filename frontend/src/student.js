@@ -19,18 +19,33 @@ const calendarFilters = {
   offline: true
 };
 
-// Placement Calendar Database array (persisted via localStorage)
-let calendarEvents = [];
-const storedEvents = localStorage.getItem('calendarEvents');
-if (storedEvents) {
-  calendarEvents = JSON.parse(storedEvents);
-} else {
-  calendarEvents = []; // Start completely empty as requested
+// XSS Prevention Utility
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// Persist events array
-function saveEvents() {
-  localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
+// Placement Calendar Database array
+let calendarEvents = [];
+
+// Fetch events from secure backend
+async function fetchEvents() {
+  try {
+    const res = await fetch(`${API}/api/events`);
+    if (res.ok) {
+      calendarEvents = await res.json();
+    } else {
+      calendarEvents = [];
+    }
+  } catch (err) {
+    console.error('Failed to fetch events:', err);
+    calendarEvents = [];
+  }
 }
 
 // Router Entry
@@ -591,7 +606,7 @@ function generateCalendarGrid() {
         cellContent += `
           <div class="calendar-event-pill event-${ev.type}" data-event-id="${ev.id}">
             <span class="event-dot"></span>
-            <span class="event-text">${ev.title}${modeTag}</span>
+            <span class="event-text">${escapeHTML(ev.title)}${modeTag}</span>
           </div>
         `;
       });
@@ -651,7 +666,8 @@ function showEventDetailModalVisitor(event) {
   const card = document.getElementById('modal-card-content');
   
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  const dateObj = new Date(event.date);
+  const parts = event.date.split('-');
+  const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
   const dateStr = dateObj.toLocaleDateString('en-US', options);
   
   const modeBadge = event.mode ? `<span class="modal-mode-badge mode-${event.mode}">${event.mode.toUpperCase()}</span>` : '';
@@ -662,9 +678,9 @@ function showEventDetailModalVisitor(event) {
       ${modeBadge}
       <button class="modal-close" onclick="hideEventModal()">&times;</button>
     </div>
-    <h3 class="modal-title">${event.title}</h3>
+    <h3 class="modal-title">${escapeHTML(event.title)}</h3>
     <div class="modal-date">${dateStr}</div>
-    <p class="modal-desc">${event.desc}</p>
+    <p class="modal-desc">${escapeHTML(event.desc)}</p>
   `;
   modal.classList.add('active');
 }
@@ -675,7 +691,8 @@ function showEventDetailModalAdmin(event) {
   const card = document.getElementById('modal-card-content');
   
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  const dateObj = new Date(event.date);
+  const parts = event.date.split('-');
+  const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
   const dateStr = dateObj.toLocaleDateString('en-US', options);
   
   const modeBadge = event.mode ? `<span class="modal-mode-badge mode-${event.mode}">${event.mode.toUpperCase()}</span>` : '';
@@ -686,9 +703,9 @@ function showEventDetailModalAdmin(event) {
       ${modeBadge}
       <button class="modal-close" onclick="hideEventModal()">&times;</button>
     </div>
-    <h3 class="modal-title">${event.title}</h3>
+    <h3 class="modal-title">${escapeHTML(event.title)}</h3>
     <div class="modal-date">${dateStr}</div>
-    <p class="modal-desc">${event.desc}</p>
+    <p class="modal-desc">${escapeHTML(event.desc)}</p>
     <div class="modal-actions">
       <button class="modal-btn edit-btn" id="modal-edit-btn">Edit Update</button>
       <button class="modal-btn delete-btn" id="modal-delete-btn">Delete Update</button>
@@ -702,13 +719,31 @@ function showEventDetailModalAdmin(event) {
   });
   
   // Delete click
-  document.getElementById('modal-delete-btn').addEventListener('click', () => {
+  document.getElementById('modal-delete-btn').addEventListener('click', async (e) => {
     if (confirm(`Are you sure you want to delete the placement update for "${event.title}"?`)) {
-      calendarEvents = calendarEvents.filter(ev => ev.id !== event.id);
-      saveEvents();
-      hideEventModal();
-      generateCalendarGrid();
-      generateMiniCalendar();
+      const btn = e.target;
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+      const token = sessionStorage.getItem('adminToken');
+      
+      try {
+        const res = await fetch(`${API}/api/events`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ id: event.id })
+        });
+        
+        if (!res.ok) throw new Error('Delete failed');
+        
+        await fetchEvents();
+        hideEventModal();
+        generateCalendarGrid();
+        generateMiniCalendar();
+      } catch (err) {
+        alert('Failed to delete event. Please check your connection.');
+        btn.disabled = false;
+        btn.textContent = 'Delete Update';
+      }
     }
   });
 }
@@ -782,18 +817,46 @@ function showEditEventModal(event) {
     showEventDetailModalAdmin(event);
   });
   
-  document.getElementById('edit-event-form').addEventListener('submit', (e) => {
+  document.getElementById('edit-event-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    event.title = document.getElementById('form-title').value.trim();
-    event.type = document.getElementById('form-type').value;
-    event.mode = document.getElementById('form-mode').value || null;
-    event.date = document.getElementById('form-date').value;
-    event.desc = document.getElementById('form-desc').value.trim();
+    const title = document.getElementById('form-title').value.trim();
+    const type = document.getElementById('form-type').value;
+    const mode = document.getElementById('form-mode').value || null;
+    const date = document.getElementById('form-date').value;
+    const desc = document.getElementById('form-desc').value.trim();
     
-    saveEvents();
-    hideEventModal();
-    generateCalendarGrid();
-    generateMiniCalendar();
+    const submitBtn = e.target.querySelector('.form-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    const token = sessionStorage.getItem('adminToken');
+    
+    const updatedEvent = {
+      id: event.id,
+      title,
+      type,
+      mode,
+      date,
+      desc
+    };
+    
+    try {
+      const res = await fetch(`${API}/api/events`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(updatedEvent)
+      });
+      
+      if (!res.ok) throw new Error('Update failed');
+      
+      await fetchEvents();
+      hideEventModal();
+      generateCalendarGrid();
+      generateMiniCalendar();
+    } catch (err) {
+      alert('Failed to update event. Please try again.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save Changes';
+    }
   });
 }
 
@@ -864,7 +927,7 @@ function showCreateEventModal(dateStr) {
   onlineBtn.addEventListener('click', () => handleFormatClick(onlineBtn, 'online'));
   offlineBtn.addEventListener('click', () => handleFormatClick(offlineBtn, 'offline'));
   
-  document.getElementById('create-event-form').addEventListener('submit', (e) => {
+  document.getElementById('create-event-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = document.getElementById('form-title').value.trim();
     const type = document.getElementById('form-type').value;
@@ -872,8 +935,13 @@ function showCreateEventModal(dateStr) {
     const date = document.getElementById('form-date').value;
     const desc = document.getElementById('form-desc').value.trim();
     
+    const submitBtn = e.target.querySelector('.form-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Posting...';
+    const token = sessionStorage.getItem('adminToken');
+    
     const newEvent = {
-      id: Date.now(),
+      id: Date.now(), // Still used as unique numeric identifier
       title,
       type,
       mode,
@@ -881,11 +949,24 @@ function showCreateEventModal(dateStr) {
       desc
     };
     
-    calendarEvents.push(newEvent);
-    saveEvents();
-    hideEventModal();
-    generateCalendarGrid();
-    generateMiniCalendar();
+    try {
+      const res = await fetch(`${API}/api/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(newEvent)
+      });
+      
+      if (!res.ok) throw new Error('Post failed');
+      
+      await fetchEvents();
+      hideEventModal();
+      generateCalendarGrid();
+      generateMiniCalendar();
+    } catch (err) {
+      alert('Failed to create event. Please try again.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Post Update';
+    }
   });
 }
 
@@ -1100,6 +1181,7 @@ function renderStudent(targetSem) {
 
 // Initial Boot — verify existing JWT token before rendering
 async function boot() {
+  await fetchEvents();
   const token = sessionStorage.getItem('adminToken');
   if (token) {
     try {
