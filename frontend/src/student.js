@@ -114,7 +114,7 @@ function renderHome(container) {
               <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
             </svg>
           </div>
-          <div class="card-title">ISE Placements</div>
+          <div class="card-title">ISE Marks Registry</div>
           <div class="card-desc">Explore professional placements, active career opportunities, and direct recruitment logs.</div>
           <div class="card-action">Visit Portal →</div>
         </button>
