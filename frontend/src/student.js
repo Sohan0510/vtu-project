@@ -81,12 +81,6 @@ function renderHome(container) {
         </div>
         <div class="toast-progress-bar"></div>
       </div>
-
-      <div class="luxury-crest">
-        <div class="crest-line"></div>
-        <span class="crest-text">EST. 2026</span>
-        <div class="crest-line"></div>
-      </div>
       <header class="lobby-header">
         <h1>PLACEMENT & STUDENT REGISTRY</h1>
         <p class="subtitle">RV INSTITUTE OF TECHNOLOGY & MANAGEMENT</p>
