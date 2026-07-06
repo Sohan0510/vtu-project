@@ -336,7 +336,7 @@ function renderCalendar(container) {
         <aside class="calendar-sidebar">
           <div class="mini-calendar">
             <div class="mini-month-header">
-              <span class="mini-month-title">July 2026</span>
+              <span class="mini-month-title"></span>
             </div>
             <div class="mini-grid">
               <div class="mini-day-name">S</div>
@@ -387,14 +387,9 @@ function renderCalendar(container) {
               <button class="toolbar-btn today-btn" id="cal-today-btn">Today</button>
               <div class="toolbar-nav">
                 <button class="toolbar-nav-btn" id="cal-prev-btn">&lt;</button>
-                <span class="toolbar-current-month">July 2026</span>
+                <span class="toolbar-current-month"></span>
                 <button class="toolbar-nav-btn" id="cal-next-btn">&gt;</button>
               </div>
-            </div>
-            <div class="toolbar-right">
-              <button class="toolbar-view-btn active">Month</button>
-              <button class="toolbar-view-btn">Week</button>
-              <button class="toolbar-view-btn">Day</button>
             </div>
           </div>
 
@@ -941,7 +936,7 @@ function showCreateEventModal(dateStr) {
     const token = sessionStorage.getItem('adminToken');
     
     const newEvent = {
-      id: Date.now(), // Still used as unique numeric identifier
+      id: Date.now() + Math.floor(Math.random() * 10000), // Prevent collision risk
       title,
       type,
       mode,
