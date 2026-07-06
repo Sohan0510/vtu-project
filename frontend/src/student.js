@@ -445,6 +445,7 @@ function renderCalendar(container) {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       isAdmin = false;
+      sessionStorage.removeItem('adminToken');
       render();
     });
   }
@@ -888,14 +889,6 @@ function showCreateEventModal(dateStr) {
   });
 }
 
-// Helper for secure client-side hashing
-async function sha256(message) {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 // Admin Authorization Login Modal Form
 function showLoginModal() {
   const modal = document.getElementById('event-modal');
@@ -929,20 +922,38 @@ function showLoginModal() {
     const id = document.getElementById('admin-id').value.trim();
     const password = document.getElementById('admin-password').value;
     const errorMsg = document.getElementById('login-error');
+    const submitBtn = e.target.querySelector('.form-submit-btn');
     
-    // Compute input hashes
-    const idHash = await sha256(id);
-    const pwHash = await sha256(password);
+    // Disable button while authenticating
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Authenticating...';
+    errorMsg.classList.remove('active');
     
-    // Compare against pre-hashed credentials (mdadmin / placement123)
-    if (idHash === 'd9dc51915ea0c76fb57eb5c5c720c941589548f4a1fd46d195d3d4da471dfb69' && 
-        pwHash === '161dad5feafc5f15e0b71cd7cb868309ef0614240fe0e209f192c606c5fb5aec') {
-      isAdmin = true;
-      hideEventModal();
-      render(); // Re-render calendar page to update grid interactivity and toolbar logout button
-    } else {
-      errorMsg.textContent = 'Invalid Admin ID or Password.';
+    try {
+      const res = await fetch(`${API}/api/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, password })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.token) {
+        // Store JWT token securely in sessionStorage
+        sessionStorage.setItem('adminToken', data.token);
+        isAdmin = true;
+        hideEventModal();
+        render();
+      } else {
+        errorMsg.textContent = data.detail || 'Invalid Admin ID or Password.';
+        errorMsg.classList.add('active');
+      }
+    } catch (err) {
+      errorMsg.textContent = 'Unable to connect to authentication server.';
       errorMsg.classList.add('active');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Authenticate';
     }
   });
 }
@@ -1062,5 +1073,28 @@ function renderStudent(targetSem) {
   document.getElementById('marks-section').innerHTML = marksHtml;
 }
 
-// Initial Boot
-render();
+// Initial Boot — verify existing JWT token before rendering
+async function boot() {
+  const token = sessionStorage.getItem('adminToken');
+  if (token) {
+    try {
+      const res = await fetch(`${API}/api/verify`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.valid && data.admin) {
+        isAdmin = true;
+      } else {
+        // Token expired or invalid — clean up
+        sessionStorage.removeItem('adminToken');
+        isAdmin = false;
+      }
+    } catch {
+      // Network error — don't block the app, just start as non-admin
+      isAdmin = false;
+    }
+  }
+  render();
+}
+
+boot();
