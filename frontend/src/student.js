@@ -50,6 +50,22 @@ function render() {
 function renderHome(container) {
   container.innerHTML = `
     <div class="lobby-container">
+      <!-- Toast Notification -->
+      <div class="lobby-toast" id="lobby-toast">
+        <div class="toast-content">
+          <div class="toast-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </div>
+          <div class="toast-text-wrapper">
+            <div class="toast-heading">Upcoming Update</div>
+            <div class="toast-message" id="toast-message-text"></div>
+          </div>
+        </div>
+        <div class="toast-progress-bar"></div>
+      </div>
+
       <div class="luxury-crest">
         <div class="crest-line"></div>
         <span class="crest-text">EST. 2026</span>
@@ -124,6 +140,51 @@ function renderHome(container) {
     currentView = 'calendar';
     render();
   });
+
+  // Trigger upcoming calendar event toast
+  triggerUpcomingToast();
+}
+
+// Helper to find and render upcoming event notification toast
+function triggerUpcomingToast() {
+  const toast = document.getElementById('lobby-toast');
+  if (!toast) return;
+
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${y}-${m}-${d}`;
+
+  const upcoming = calendarEvents
+    .filter(ev => ev.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const msgText = document.getElementById('toast-message-text');
+  if (upcoming.length > 0) {
+    const nextEv = upcoming[0];
+    const formatLabel = nextEv.mode ? ` (${nextEv.mode.charAt(0).toUpperCase() + nextEv.mode.slice(1)})` : '';
+    
+    // Parse date array safely for local formatting
+    const parts = nextEv.date.split('-');
+    const eventDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    const formattedDate = eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    msgText.innerHTML = `<strong>${nextEv.title}</strong>${formatLabel} on ${formattedDate}`;
+  } else {
+    msgText.textContent = 'No upcoming placement updates scheduled.';
+  }
+
+  // Add active animation class
+  setTimeout(() => {
+    toast.classList.add('show');
+  }, 150);
+
+  // Fade out toast after 5s
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+  }, 5000);
 }
 
 // 2. Render CSE Marks View
