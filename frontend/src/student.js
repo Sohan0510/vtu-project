@@ -8,6 +8,7 @@ let currentView = 'home';
 let currentStudentData = null;
 let activeSem = 'all';
 let isAdmin = false;
+let currentCalendarDate = new Date();
 
 // Calendar Filter States (Online & Offline drives added)
 const calendarFilters = {
@@ -133,7 +134,7 @@ function renderHome(container) {
   });
 
   document.getElementById('btn-ise').addEventListener('click', () => {
-    window.location.href = 'https://placements-rvitm.netlify.app/jobs';
+    window.location.href = 'https://placements-rvitm.netlify.app/student';
   });
 
   document.getElementById('btn-calendar').addEventListener('click', () => {
@@ -411,6 +412,23 @@ function renderCalendar(container) {
   generateMiniCalendar();
   generateCalendarGrid();
 
+  // Calendar navigation
+  document.getElementById('cal-prev-btn')?.addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    generateMiniCalendar();
+    generateCalendarGrid();
+  });
+  document.getElementById('cal-next-btn')?.addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    generateMiniCalendar();
+    generateCalendarGrid();
+  });
+  document.getElementById('cal-today-btn')?.addEventListener('click', () => {
+    currentCalendarDate = new Date();
+    generateMiniCalendar();
+    generateCalendarGrid();
+  });
+
   // Bind back button
   document.getElementById('calendar-back').addEventListener('click', () => {
     currentView = 'home';
@@ -455,7 +473,14 @@ function getCategoryLabel(type) {
   return labels[type] || 'Event';
 }
 
-// 4. Generate Sidebar Mini Calendar (July 2026)
+function getMonthData(year, month) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  return { firstDay, daysInMonth, daysInPrevMonth };
+}
+
+// 4. Generate Sidebar Mini Calendar
 function generateMiniCalendar() {
   const miniGrid = document.querySelector('.mini-grid');
   if (!miniGrid) return;
@@ -464,23 +489,35 @@ function generateMiniCalendar() {
   miniGrid.innerHTML = '';
   headers.forEach(h => miniGrid.appendChild(h));
 
-  // Render June Padding in Mini (June 28, 29, 30)
-  const juneMini = [28, 29, 30];
-  juneMini.forEach(day => {
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+  
+  const title = document.querySelector('.mini-month-title');
+  if (title) {
+    title.textContent = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  const { firstDay, daysInMonth, daysInPrevMonth } = getMonthData(year, month);
+  const today = new Date();
+  
+  // Previous month filler days
+  for (let i = firstDay - 1; i >= 0; i--) {
     const el = document.createElement('div');
     el.className = 'mini-day-cell prev-month';
-    el.textContent = day;
+    el.textContent = daysInPrevMonth - i;
     miniGrid.appendChild(el);
-  });
+  }
 
-  // July days (1 to 31)
-  for (let d = 1; d <= 31; d++) {
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
     const el = document.createElement('div');
     el.className = 'mini-day-cell';
-    if (d === 6) el.classList.add('today');
+    if (d === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+      el.classList.add('today');
+    }
     
     // Highlight days with events
-    const dateStr = `2026-07-${String(d).padStart(2, '0')}`;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const hasEvents = calendarEvents.some(ev => ev.date === dateStr);
     if (hasEvents) el.classList.add('has-event');
     
@@ -488,11 +525,14 @@ function generateMiniCalendar() {
     miniGrid.appendChild(el);
   }
 
-  // August padding (August 1)
-  const el = document.createElement('div');
-  el.className = 'mini-day-cell next-month';
-  el.textContent = '1';
-  miniGrid.appendChild(el);
+  // Next month filler days
+  const remainingCells = 42 - (firstDay + daysInMonth); // standard 6 rows
+  for (let d = 1; d <= remainingCells; d++) {
+    const el = document.createElement('div');
+    el.className = 'mini-day-cell next-month';
+    el.textContent = d;
+    miniGrid.appendChild(el);
+  }
 }
 
 // 5. Generate Main Calendar Grid
@@ -501,26 +541,34 @@ function generateCalendarGrid() {
   if (!gridContainer) return;
   gridContainer.innerHTML = '';
 
-  const juneDays = [28, 29, 30];
-  const augustDays = [1];
-  
-  // June filler days
-  juneDays.forEach(day => {
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+
+  const title = document.querySelector('.toolbar-current-month');
+  if (title) {
+    title.textContent = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  const { firstDay, daysInMonth, daysInPrevMonth } = getMonthData(year, month);
+  const today = new Date();
+
+  // Prev month days
+  for (let i = firstDay - 1; i >= 0; i--) {
     const cell = document.createElement('div');
     cell.className = 'calendar-day-cell prev-month';
-    cell.innerHTML = `<span class="day-number">${day}</span>`;
+    cell.innerHTML = `<span class="day-number">${daysInPrevMonth - i}</span>`;
     gridContainer.appendChild(cell);
-  });
+  }
 
-  // July days
-  for (let d = 1; d <= 31; d++) {
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
     const cell = document.createElement('div');
     cell.className = 'calendar-day-cell';
     if (isAdmin) cell.classList.add('admin-active');
     
-    const dateStr = `2026-07-${String(d).padStart(2, '0')}`;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     
-    if (d === 6) {
+    if (d === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
       cell.classList.add('today');
     }
 
@@ -561,13 +609,14 @@ function generateCalendarGrid() {
     });
   }
 
-  // August filler days
-  augustDays.forEach(day => {
+  // Next month filler days
+  const remainingCells = 42 - (firstDay + daysInMonth);
+  for (let d = 1; d <= remainingCells; d++) {
     const cell = document.createElement('div');
     cell.className = 'calendar-day-cell next-month';
-    cell.innerHTML = `<span class="day-number">${day}</span>`;
+    cell.innerHTML = `<span class="day-number">${d}</span>`;
     gridContainer.appendChild(cell);
-  });
+  }
 
   // Bind click event to event pills for details viewing
   document.querySelectorAll('.calendar-event-pill').forEach(pill => {
