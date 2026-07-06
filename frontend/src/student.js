@@ -1,7 +1,7 @@
 import './student.css';
 
 // Dynamic API detection for localhost development and cloud staging
-const API = 'https://vtu-project.onrender.com'; // Point to deployed backend
+const API = 'https://fast-student-api.vercel.app'; // Point to deployed backend
 
 // SPA Navigation State
 let currentView = 'home';
