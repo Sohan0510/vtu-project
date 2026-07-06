@@ -115,7 +115,7 @@ function renderHome(container) {
             </svg>
           </div>
           <div class="card-title">ISE Marks Registry</div>
-          <div class="card-desc">Explore professional placements, active career opportunities, and direct recruitment logs.</div>
+          <div class="card-desc">Access student examinations database, calculate GPA indices, and query academic logs.</div>
           <div class="card-action">Visit Portal →</div>
         </button>
       </div>
