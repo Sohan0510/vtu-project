@@ -183,18 +183,25 @@ def get_result(usn: str):
         raise HTTPException(status_code=404, detail=f"No result found for USN: {usn}")
         
     subjects = result.get("subjects", {})
-    for code, sub in subjects.items():
-        sub["credits"] = get_credits(code)
+    if subjects:
+        for code, sub in subjects.items():
+            sub["credits"] = get_credits(code)
+            
+        sems = list(set([s.get("semester", 0) for s in subjects.values()]))
+        latest_sem = max(sems) if sems else 0
+        result["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
+        result["cgpa"], _ = calculate_cgpa(subjects)
         
-    sems = list(set([s.get("semester", 0) for s in subjects.values()]))
-    latest_sem = max(sems) if sems else 0
-    result["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
-    result["cgpa"], _ = calculate_cgpa(subjects)
-    
-    result["sgpa_map"] = {}
-    for sem in sems:
-        sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
-        result["sgpa_map"][sem] = sem_sgpa
+        result["sgpa_map"] = {}
+        for sem in sems:
+            sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+            result["sgpa_map"][sem] = sem_sgpa
+    else:
+        # Protect database-only CGPA/SGPA values (no subjects list available)
+        if "sgpa" not in result or result["sgpa"] is None:
+            result["sgpa"] = result.get("cgpa")
+        if "sgpa_map" not in result or not result["sgpa_map"]:
+            result["sgpa_map"] = {str(sem): result.get("cgpa") for sem in result.get("semesters", [1])}
     
     return result
 
@@ -208,18 +215,25 @@ def get_all_results_endpoint():
     
     for result in results:
         subjects = result.get("subjects", {})
-        for code, sub in subjects.items():
-            sub["credits"] = get_credits(code)
+        if subjects:
+            for code, sub in subjects.items():
+                sub["credits"] = get_credits(code)
+                
+            sems = list(set([s.get("semester", 0) for s in subjects.values()]))
+            latest_sem = max(sems) if sems else 0
+            result["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
+            result["cgpa"], _ = calculate_cgpa(subjects)
             
-        sems = list(set([s.get("semester", 0) for s in subjects.values()]))
-        latest_sem = max(sems) if sems else 0
-        result["sgpa"], _ = calculate_sgpa(subjects, target_sem=latest_sem)
-        result["cgpa"], _ = calculate_cgpa(subjects)
-        
-        result["sgpa_map"] = {}
-        for sem in sems:
-            sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
-            result["sgpa_map"][sem] = sem_sgpa
+            result["sgpa_map"] = {}
+            for sem in sems:
+                sem_sgpa, _ = calculate_sgpa(subjects, target_sem=sem)
+                result["sgpa_map"][sem] = sem_sgpa
+        else:
+            # Protect database-only CGPA/SGPA values (no subjects list available)
+            if "sgpa" not in result or result["sgpa"] is None:
+                result["sgpa"] = result.get("cgpa")
+            if "sgpa_map" not in result or not result["sgpa_map"]:
+                result["sgpa_map"] = {str(sem): result.get("cgpa") for sem in result.get("semesters", [1])}
             
     return {"results": results}
 

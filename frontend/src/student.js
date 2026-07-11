@@ -1,7 +1,8 @@
 import './student.css';
 
-// Dynamic API detection for localhost development and cloud staging
-const API = 'https://fast-student-api.vercel.app'; // Point to deployed backend
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? ''
+  : 'https://fast-student-api.vercel.app';
 
 // SPA Navigation State
 let currentView = 'home';
@@ -58,6 +59,8 @@ function render() {
     renderHome(container);
   } else if (currentView === 'cse') {
     renderCSE(container);
+  } else if (currentView === 'ece') {
+    renderECE(container);
   } else if (currentView === 'calendar') {
     renderCalendar(container);
   }
@@ -129,6 +132,17 @@ function renderHome(container) {
           <div class="card-desc">Access student examinations database, calculate GPA indices, and query academic logs.</div>
           <div class="card-action">Visit Portal →</div>
         </button>
+
+        <button class="nav-card" id="btn-ece">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div class="card-title">ECE Marks Registry</div>
+          <div class="card-desc">Access student examinations database, calculate GPA indices, and query academic logs.</div>
+          <div class="card-action">Enter Registry →</div>
+        </button>
       </div>
       
       <footer class="lobby-footer">
@@ -145,6 +159,11 @@ function renderHome(container) {
 
   document.getElementById('btn-ise').addEventListener('click', () => {
     window.location.href = 'https://placements-rvitm.netlify.app/student';
+  });
+
+  document.getElementById('btn-ece').addEventListener('click', () => {
+    currentView = 'ece';
+    render();
   });
 
   document.getElementById('btn-calendar').addEventListener('click', () => {
@@ -287,6 +306,97 @@ function renderCSE(container) {
     }
   });
 }
+
+// 2.5. Render ECE Marks View
+function renderECE(container) {
+  container.innerHTML = `
+    <div class="ece-container">
+      <div class="view-header-bar">
+        <button class="btn-back" id="ece-back">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Return to Registry
+        </button>
+        <div class="view-title-wrapper">
+          <h2>ECE Marks Registry</h2>
+          <p>Official Examination Database Query</p>
+        </div>
+      </div>
+
+      <div class="search-container">
+        <form id="search-form" class="search-box">
+          <svg class="search-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="usn-input" class="search-input" placeholder="Enter USN (e.g. 1RF23EC001)" required maxlength="12" autocomplete="off" spellcheck="false">
+          <button type="submit" class="search-btn">Query Database</button>
+        </form>
+        <div id="error-msg" class="error-msg"></div>
+      </div>
+
+      <div id="spinner" class="spinner-container">
+        <div class="spinner"></div>
+      </div>
+
+      <div id="result-container" class="result-container">
+        <div class="profile-card" id="profile-card"></div>
+        <div class="semesters-nav" id="semesters-nav"></div>
+        <div class="marks-section" id="marks-section"></div>
+      </div>
+    </div>
+  `;
+
+  // Restore active student state if returning to view
+  if (currentStudentData) {
+    document.getElementById('usn-input').value = currentStudentData.usn;
+    document.getElementById('result-container').classList.add('active');
+    renderStudent(activeSem);
+  }
+
+  // Bind back button
+  document.getElementById('ece-back').addEventListener('click', () => {
+    currentView = 'home';
+    render();
+  });
+
+  // Bind search form submit
+  const form = document.getElementById('search-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const usn = document.getElementById('usn-input').value.trim().toUpperCase();
+    if (!usn) return;
+
+    const resultContainer = document.getElementById('result-container');
+    const errorMsg = document.getElementById('error-msg');
+    const spinner = document.getElementById('spinner');
+
+    resultContainer.classList.remove('active');
+    errorMsg.classList.remove('active');
+    spinner.classList.add('active');
+
+    try {
+      const res = await fetch(`${API}/api/results/${usn}`);
+      if (!res.ok) {
+        throw new Error('Student record not found in registry database.');
+      }
+      const data = await res.json();
+      currentStudentData = data;
+      activeSem = 'all';
+      
+      renderStudent('all');
+      
+      spinner.classList.remove('active');
+      resultContainer.classList.add('active');
+    } catch (err) {
+      spinner.classList.remove('active');
+      errorMsg.textContent = err.message;
+      errorMsg.classList.add('active');
+    }
+  });
+}
+
 
 // 3. Render Outlook Calendar View (with Admin authentication)
 function renderCalendar(container) {
@@ -1247,6 +1357,27 @@ function renderStudent(targetSem) {
   
   // Render Profile Card
   const initials = (data.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2);
+  const isECE = data.usn && (data.usn.includes('EC') || data.usn.includes('ec'));
+
+  if (isECE) {
+    document.getElementById('profile-card').innerHTML = `
+      <div class="profile-avatar">${initials}</div>
+      <div class="profile-info">
+        <div class="profile-name">${data.name || 'Unknown'}</div>
+        <div class="profile-usn">${data.usn} &bull; ECE Department Registry</div>
+      </div>
+      <div class="score-cards">
+        <div class="score-card cgpa-card">
+          <div class="score-val">${data.cgpa || '-'}</div>
+          <div class="score-lbl">Overall CGPA</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('semesters-nav').innerHTML = '';
+    document.getElementById('marks-section').innerHTML = '';
+    return;
+  }
+
   document.getElementById('profile-card').innerHTML = `
     <div class="profile-avatar">${initials}</div>
     <div class="profile-info">
