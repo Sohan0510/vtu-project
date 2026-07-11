@@ -9,6 +9,7 @@ let currentStudentData = null;
 let activeSem = 'all';
 let isAdmin = false;
 let currentCalendarDate = new Date();
+let selectedCalendarDate = new Date();
 
 // Calendar Filter States (Online & Offline drives added)
 const calendarFilters = {
@@ -400,6 +401,10 @@ function renderCalendar(container) {
           <div class="calendar-grid-body" id="calendar-days-grid">
             <!-- Grid days rendered dynamically -->
           </div>
+          <!-- Agenda View for Selected Day (optimized for Mobile UX) -->
+          <div class="calendar-agenda" id="calendar-agenda-view">
+            <!-- Agenda content populated dynamically -->
+          </div>
         </main>
       </div>
     </div>
@@ -577,6 +582,14 @@ function generateCalendarGrid() {
       cell.classList.add('today');
     }
 
+    // Highlight if selected
+    const selYear = selectedCalendarDate.getFullYear();
+    const selMonth = selectedCalendarDate.getMonth();
+    const selDay = selectedCalendarDate.getDate();
+    if (d === selDay && month === selMonth && year === selYear) {
+      cell.classList.add('selected-day');
+    }
+
     let cellContent = `<span class="day-number">${d}</span>`;
     
     // Extract events active under current filters (category + format filter)
@@ -605,12 +618,19 @@ function generateCalendarGrid() {
     cell.innerHTML = cellContent;
     gridContainer.appendChild(cell);
 
-    // Bind click listener on day cell for ADMIN placement event insertion
+    // Bind click listener on day cell for selection and admin placement event insertion
     cell.addEventListener('click', (e) => {
-      if (!isAdmin) return;
-      // Do not trigger cell add form if user clicks directly on an existing event pill
+      // Do not trigger selection change if user clicks directly on an existing event pill
       if (e.target.closest('.calendar-event-pill')) return;
-      showCreateEventModal(dateStr);
+
+      selectedCalendarDate = new Date(year, month, d);
+      generateCalendarGrid();
+
+      // Only show the direct create modal if Admin and on desktop (width > 768px)
+      // Mobile admins will use the "Add Update" button inside the Agenda view
+      if (isAdmin && window.innerWidth > 768) {
+        showCreateEventModal(dateStr);
+      }
     });
   }
 
@@ -638,6 +658,149 @@ function generateCalendarGrid() {
       }
     });
   });
+
+  // Render agenda list for the selected date
+  renderAgendaList();
+}
+
+// 5.5. Render Agenda List for Selected Day
+function renderAgendaList() {
+  const agendaContainer = document.getElementById('calendar-agenda-view');
+  if (!agendaContainer) return;
+
+  const selYear = selectedCalendarDate.getFullYear();
+  const selMonth = selectedCalendarDate.getMonth();
+  const selDay = selectedCalendarDate.getDate();
+  const dateStr = `${selYear}-${String(selMonth + 1).padStart(2, '0')}-${String(selDay).padStart(2, '0')}`;
+
+  const formattedDateStr = selectedCalendarDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  // Filter events for this day matching active filters
+  const events = calendarEvents.filter(ev => {
+    if (ev.date !== dateStr) return false;
+    if (!calendarFilters[ev.type]) return false;
+    if (ev.mode === 'online' && !calendarFilters.online) return false;
+    if (ev.mode === 'offline' && !calendarFilters.offline) return false;
+    return true;
+  });
+
+  let html = `
+    <div class="agenda-header">
+      <div class="agenda-title">Schedule for ${formattedDateStr}</div>
+      ${isAdmin ? `
+        <button class="agenda-add-btn" id="agenda-add-event-btn">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg> Add Update
+        </button>
+      ` : ''}
+    </div>
+    <div class="agenda-items">
+  `;
+
+  if (events.length === 0) {
+    html += `
+      <div class="agenda-empty">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>No placement events or activities scheduled.</span>
+      </div>
+    `;
+  } else {
+    events.forEach(ev => {
+      const modeTag = ev.mode ? `<span class="agenda-mode-tag mode-${ev.mode}">${ev.mode.toUpperCase()}</span>` : '';
+      html += `
+        <div class="agenda-card event-${ev.type}" data-event-id="${ev.id}">
+          <div class="agenda-card-header">
+            <span class="agenda-category-badge category-${ev.type}">${getCategoryLabel(ev.type)}</span>
+            ${modeTag}
+          </div>
+          <div class="agenda-card-body">
+            <h4 class="agenda-event-title">${escapeHTML(ev.title)}</h4>
+            <p class="agenda-event-desc">${escapeHTML(ev.desc)}</p>
+          </div>
+          ${isAdmin ? `
+            <div class="agenda-card-actions">
+              <button class="agenda-action-btn edit" data-action="edit">Edit</button>
+              <button class="agenda-action-btn delete" data-action="delete">Delete</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    });
+  }
+
+  html += `</div>`;
+  agendaContainer.innerHTML = html;
+
+  // Bind click listener on agenda card for viewing full details modal
+  agendaContainer.querySelectorAll('.agenda-card').forEach(card => {
+    const eventId = parseInt(card.getAttribute('data-event-id'));
+    const ev = calendarEvents.find(event => event.id === eventId);
+    if (!ev) return;
+
+    card.addEventListener('click', (e) => {
+      // Do not open details modal if clicking edit/delete action buttons
+      if (e.target.closest('.agenda-card-actions')) return;
+
+      if (isAdmin) {
+        showEventDetailModalAdmin(ev);
+      } else {
+        showEventDetailModalVisitor(ev);
+      }
+    });
+
+    if (isAdmin) {
+      card.querySelector('.agenda-action-btn.edit')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showEditEventModal(ev);
+      });
+
+      card.querySelector('.agenda-action-btn.delete')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (confirm(`Are you sure you want to delete the placement update for "${ev.title}"?`)) {
+          const btn = e.target;
+          btn.disabled = true;
+          btn.textContent = 'Deleting...';
+          const token = sessionStorage.getItem('adminToken');
+          
+          try {
+            const res = await fetch(`${API}/api/events`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ id: ev.id })
+            });
+            
+            if (!res.ok) throw new Error('Delete failed');
+            
+            await fetchEvents();
+            generateCalendarGrid();
+            generateMiniCalendar();
+          } catch (err) {
+            alert('Failed to delete event. Please check your connection.');
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+          }
+        }
+      });
+    }
+  });
+
+  // Bind add button click handler
+  if (isAdmin) {
+    document.getElementById('agenda-add-event-btn')?.addEventListener('click', () => {
+      showCreateEventModal(dateStr);
+    });
+  }
 }
 
 // 6. Dynamic Modal Overlays

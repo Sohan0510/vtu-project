@@ -1588,6 +1588,213 @@ tr:hover td {
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* ── Calendar Agenda View Styles ── */
+.calendar-agenda {
+  background-color: var(--bg-parchment);
+  border-top: 1px solid var(--border-gold);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agenda-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed var(--border-gold);
+  padding-bottom: 12px;
+}
+
+.agenda-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--wood-dark);
+}
+
+.agenda-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--wood-dark);
+  color: var(--gold-light);
+  border: 1px solid var(--gold-satin);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.agenda-add-btn:hover {
+  background-color: var(--wood-medium);
+  box-shadow: var(--shadow-premium);
+  transform: translateY(-1px);
+}
+
+.agenda-add-btn svg {
+  margin-right: 2px;
+}
+
+.agenda-items {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.agenda-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  gap: 10px;
+  text-align: center;
+}
+
+.agenda-empty svg {
+  color: var(--gold-satin);
+}
+
+.agenda-card {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  box-shadow: var(--shadow-premium);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-left-width 0.15s ease;
+  position: relative;
+}
+
+.agenda-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(42, 27, 17, 0.08);
+}
+
+/* Agenda Card left highlights for visual categories */
+.agenda-card.event-academic { border-left: 4px solid var(--cat-academic-border); }
+.agenda-card.event-exams { border-left: 4px solid var(--cat-exams-border); }
+.agenda-card.event-holidays { border-left: 4px solid var(--cat-holidays-border); }
+.agenda-card.event-online { border-left: 4px solid var(--cat-online-border); }
+.agenda-card.event-offline { border-left: 4px solid var(--cat-offline-border); }
+
+.agenda-card:hover.event-academic { border-left-width: 6px; }
+.agenda-card:hover.event-exams { border-left-width: 6px; }
+.agenda-card:hover.event-holidays { border-left-width: 6px; }
+.agenda-card:hover.event-online { border-left-width: 6px; }
+.agenda-card:hover.event-offline { border-left-width: 6px; }
+
+.agenda-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.agenda-category-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+.agenda-category-badge.category-academic { background-color: var(--cat-academic-bg); color: var(--cat-academic-txt); border: 1px solid var(--cat-academic-border); }
+.agenda-category-badge.category-exams { background-color: var(--cat-exams-bg); color: var(--cat-exams-txt); border: 1px solid var(--cat-exams-border); }
+.agenda-category-badge.category-holidays { background-color: var(--cat-holidays-bg); color: var(--cat-holidays-txt); border: 1px solid var(--cat-holidays-border); }
+.agenda-category-badge.category-online { background-color: var(--cat-online-bg); color: var(--cat-online-txt); border: 1px solid var(--cat-online-border); }
+.agenda-category-badge.category-offline { background-color: var(--cat-offline-bg); color: var(--cat-offline-txt); border: 1px solid var(--cat-offline-border); }
+
+.agenda-mode-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.agenda-mode-tag.mode-online {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.agenda-mode-tag.mode-offline {
+  background-color: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.agenda-event-title {
+  font-size: 1.1rem;
+  color: var(--wood-dark);
+  font-weight: 700;
+  margin: 0;
+}
+
+.agenda-event-desc {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.agenda-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--border-gold);
+  padding-top: 10px;
+}
+
+.agenda-action-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.agenda-action-btn.edit {
+  color: var(--wood-medium);
+  border: 1px solid var(--border-gold);
+}
+
+.agenda-action-btn.edit:hover {
+  background-color: var(--bg-parchment);
+  color: var(--wood-dark);
+  border-color: var(--gold-satin);
+}
+
+.agenda-action-btn.delete {
+  color: var(--fail-text);
+  border: 1px solid var(--fail-border);
+}
+
+.agenda-action-btn.delete:hover {
+  background-color: var(--fail-bg);
+}
+
+/* Day grid selection highlight */
+.calendar-day-cell.selected-day {
+  box-shadow: inset 0 0 0 2px var(--gold-satin) !important;
+  background-color: #fffbfa !important;
+}
+
+
 /* ── Responsive Styling ── */
 @media (max-width: 900px) {
   .calendar-workspace {
@@ -1632,5 +1839,185 @@ tr:hover td {
   }
   .calendar-sidebar {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Common header optimization on mobile to prevent overlapping */
+  .view-header-bar {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    grid-template-rows: auto auto !important;
+    gap: 16px !important;
+    align-items: center !important;
+    padding-bottom: 16px !important;
+    margin-bottom: 24px !important;
+    width: 100% !important;
+  }
+
+  .btn-back {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    justify-self: start !important;
+    padding: 8px 14px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .calendar-auth-control {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+  }
+
+  .btn-auth {
+    padding: 8px 14px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .view-title-wrapper {
+    grid-column: 1 / span 2 !important;
+    grid-row: 2 !important;
+    text-align: left !important;
+  }
+
+  .view-title-wrapper h2 {
+    font-size: 1.6rem !important;
+  }
+
+  .view-title-wrapper p {
+    font-size: 0.75rem !important;
+  }
+
+  /* Force workspace and main calendar to stretch fully and avoid empty right margins */
+  .calendar-workspace,
+  .calendar-main {
+    width: 100% !important;
+  }
+
+  /* Hide mini-calendar since it takes too much space on mobile */
+  .mini-calendar {
+    display: none !important;
+  }
+
+  /* Make main calendar day grid compact */
+  .calendar-grid-body {
+    grid-auto-rows: 55px !important;
+    gap: 1px !important;
+  }
+
+  /* Align calendar cells and day numbers to top-left (just like desktop view) */
+  .calendar-day-cell {
+    padding: 6px 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    min-height: 55px !important;
+    cursor: pointer;
+  }
+
+  .day-number {
+    font-size: 0.82rem !important;
+    align-self: flex-start !important;
+    margin-top: 0 !important;
+    margin-left: 2px !important;
+  }
+
+  /* Hide textual event representation on grid cell */
+  .calendar-day-cell .calendar-event-pill {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    margin: 1px !important;
+    display: inline-block !important;
+    min-width: 6px !important;
+    border: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .calendar-day-cell .calendar-event-pill .event-text,
+  .calendar-day-cell .calendar-event-pill .pill-mode-tag,
+  .calendar-day-cell .calendar-event-pill .event-dot {
+    display: none !important;
+  }
+
+  /* Horizontal wrapper for dots, aligned left */
+  .calendar-day-cell .day-events {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 3px !important;
+    width: 100% !important;
+    height: auto !important;
+    margin-top: 4px !important;
+    margin-left: 2px !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Map event background colors to dots */
+  .calendar-day-cell .calendar-event-pill.event-academic { background-color: var(--cat-academic-border) !important; }
+  .calendar-day-cell .calendar-event-pill.event-exams { background-color: var(--cat-exams-border) !important; }
+  .calendar-day-cell .calendar-event-pill.event-holidays { background-color: var(--cat-holidays-border) !important; }
+  .calendar-day-cell .calendar-event-pill.event-online { background-color: var(--cat-online-txt) !important; }
+  .calendar-day-cell .calendar-event-pill.event-offline { background-color: var(--cat-offline-txt) !important; }
+
+  /* Toolbar adjustments */
+  .calendar-toolbar {
+    padding: 10px 14px !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+  }
+
+  .toolbar-left {
+    width: 100% !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+  }
+
+  .toolbar-current-month {
+    font-size: 1.15rem !important;
+  }
+
+  .toolbar-btn {
+    padding: 5px 10px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .calendar-grid-header div {
+    padding: 6px 0 !important;
+    font-size: 0.7rem !important;
+  }
+
+  /* Agenda list header/title mobile styling */
+  .calendar-agenda {
+    padding: 16px 14px !important;
+    gap: 12px !important;
+  }
+
+  .agenda-title {
+    font-size: 1.15rem !important;
+  }
+
+  .agenda-add-btn {
+    padding: 5px 10px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .agenda-card {
+    padding: 12px 14px !important;
+    gap: 8px !important;
+  }
+
+  .agenda-event-title {
+    font-size: 1rem !important;
+  }
+
+  .agenda-event-desc {
+    font-size: 0.82rem !important;
   }
 }

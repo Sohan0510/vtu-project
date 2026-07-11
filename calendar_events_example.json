@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1719878400000,
+    "title": "Google India Drive",
+    "type": "academic",
+    "mode": "online",
+    "date": "2026-07-10",
+    "desc": "Google India is hosting a virtual campus hiring drive for software engineering interns. Eligibility: CS/IS/ECE branch, CGPA > 8.0, zero active backlogs."
+  },
+  {
+    "id": 1719964800000,
+    "title": "Microsoft Technical Interview",
+    "type": "exams",
+    "mode": "online",
+    "date": "2026-07-15",
+    "desc": "Round 1 Technical Screening for shortlisted candidates. Focused on DSA, OS, and System Design."
+  },
+  {
+    "id": 1720051200000,
+    "title": "Semester Break / Holiday",
+    "type": "holidays",
+    "mode": null,
+    "date": "2026-07-20",
+    "desc": "Official college holiday. No academic drives scheduled."
+  }
+]
