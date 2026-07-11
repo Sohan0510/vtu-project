@@ -282,6 +282,15 @@ function renderCSE(container) {
     const errorMsg = document.getElementById('error-msg');
     const spinner = document.getElementById('spinner');
 
+    // CSE USN validation: 1RF##CS### (e.g. 1RF23CS001, 1RF24CS400)
+    const CSE_USN_REGEX = /^1RF\d{2}CS\d{3}$/;
+    if (!CSE_USN_REGEX.test(usn)) {
+      errorMsg.textContent = 'Invalid USN format. Expected format: 1RF23CS001 or 1RF24CS400';
+      errorMsg.classList.add('active');
+      resultContainer.classList.remove('active');
+      return;
+    }
+
     resultContainer.classList.remove('active');
     errorMsg.classList.remove('active');
     spinner.classList.add('active');
@@ -372,21 +381,44 @@ function renderECE(container) {
     const errorMsg = document.getElementById('error-msg');
     const spinner = document.getElementById('spinner');
 
+    // ECE USN validation: 1RF##EC### (e.g. 1RF23EC001, 1RF24EC400, 1RF21EC023)
+    const ECE_USN_REGEX = /^1RF\d{2}EC\d{3}$/;
+    if (!ECE_USN_REGEX.test(usn)) {
+      errorMsg.textContent = 'Invalid USN format. Expected format: 1RF23EC001 or 1RF24EC400';
+      errorMsg.classList.add('active');
+      resultContainer.classList.remove('active');
+      return;
+    }
+
     resultContainer.classList.remove('active');
     errorMsg.classList.remove('active');
     spinner.classList.add('active');
 
     try {
-      const res = await fetch(`${API}/api/results/${usn}`);
-      if (!res.ok) {
-        throw new Error('Student record not found in registry database.');
+      // Load ECE data directly from the static JSON file (no backend required)
+      const res = await fetch('/ece_students.json');
+      if (!res.ok) throw new Error('Failed to load ECE registry.');
+      const eceList = await res.json();
+
+      const student = eceList.find(s => s.usn === usn);
+      if (!student) {
+        throw new Error('Student record not found in ECE registry.');
       }
-      const data = await res.json();
-      currentStudentData = data;
+
+      // Shape into the same data format renderStudent() expects
+      currentStudentData = {
+        usn: student.usn,
+        name: student.name,
+        cgpa: student.cgpa,
+        sgpa: student.cgpa,
+        subjects: {},
+        semesters: student.cgpa ? [1] : [],
+        sgpa_map: student.cgpa ? { '1': student.cgpa } : {}
+      };
       activeSem = 'all';
-      
+
       renderStudent('all');
-      
+
       spinner.classList.remove('active');
       resultContainer.classList.add('active');
     } catch (err) {
