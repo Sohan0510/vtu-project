@@ -32,6 +32,14 @@ function escapeHTML(str) {
     .replace(/'/g, '&#39;');
 }
 
+// Helper for secure client-side hashing
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Placement Calendar Database array
 let calendarEvents = [];
 
@@ -57,12 +65,16 @@ function render() {
 
   if (currentView === 'home') {
     renderHome(container);
+  } else if (currentView === 'registry-selector') {
+    renderRegistrySelector(container);
   } else if (currentView === 'cse') {
     renderCSE(container);
   } else if (currentView === 'ece') {
     renderECE(container);
   } else if (currentView === 'calendar') {
     renderCalendar(container);
+  } else if (currentView === 'spc') {
+    renderSPC(container);
   }
 }
 
@@ -109,6 +121,103 @@ function renderHome(container) {
           <div class="card-action">Open Calendar →</div>
         </button>
 
+        <button class="nav-card" id="btn-marks-registry">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <circle cx="9" cy="9" r="1"/>
+            </svg>
+          </div>
+          <div class="card-title">Marks Registry</div>
+          <div class="card-desc">Access student examinations database, calculate GPA indices, and query academic logs for CSE, ISE & ECE.</div>
+          <div class="card-action">Select Branch →</div>
+        </button>
+
+        <button class="nav-card" id="btn-blacklist">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <line x1="17" y1="8" x2="23" y2="14"></line>
+              <line x1="23" y1="8" x2="17" y2="14"></line>
+            </svg>
+          </div>
+          <div class="card-title">Blacklisted Registry</div>
+          <div class="card-desc">View the official database of academic debarments, eligibility warnings, and active placement restrictions.</div>
+          <div class="card-action">Open Registry →</div>
+        </button>
+
+        <button class="nav-card" id="btn-spc">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+          <div class="card-title">SPC Control Panel</div>
+          <div class="card-desc">Access the Placement Coordinator management portal and embedded calendar configurations.</div>
+          <div class="card-action">Enter Portal →</div>
+        </button>
+      </div>
+      
+      <footer class="lobby-footer">
+        <p>Official Placement & Student Registry Portal. Secured via Departmental Access Keys.</p>
+      </footer>
+    </div>
+
+    <!-- Multi-purpose Modal Overlay -->
+    <div class="modal-overlay" id="event-modal">
+      <div class="modal-card" id="modal-card-content">
+        <!-- Renders details, CRUD forms, and logins dynamically -->
+      </div>
+    </div>
+  `;
+
+  // Bind Card Click Events
+  document.getElementById('btn-marks-registry').addEventListener('click', () => {
+    currentView = 'registry-selector';
+    render();
+  });
+
+  document.getElementById('btn-blacklist').addEventListener('click', () => {
+    window.open('https://docs.google.com/spreadsheets/d/1VaHBoHdMgSeC5tEfPZZA4VV1S703B4oLNJreDdVa40I/edit?usp=sharing', '_blank');
+  });
+
+  document.getElementById('btn-spc').addEventListener('click', () => {
+    showSPCPasswordModal();
+  });
+
+  document.getElementById('btn-calendar').addEventListener('click', () => {
+    currentView = 'calendar';
+    render();
+  });
+
+  // Trigger upcoming calendar event toast
+  triggerUpcomingToast();
+}
+
+// 1.5 Render Registry Selection Page (for CSE, ISE, ECE selector)
+function renderRegistrySelector(container) {
+  container.innerHTML = `
+    <div class="selector-container">
+      <div class="view-header-bar">
+        <button class="btn-back" id="selector-back">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Return to Dashboard
+        </button>
+        <div class="view-title-wrapper">
+          <h2>Marks Registry</h2>
+          <p>Select Branch Academic Database</p>
+        </div>
+      </div>
+
+      <div class="navigation-grid" style="margin-top: 40px;">
         <button class="nav-card" id="btn-cse">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none">
@@ -144,14 +253,16 @@ function renderHome(container) {
           <div class="card-action">Enter Registry →</div>
         </button>
       </div>
-      
-      <footer class="lobby-footer">
-        <p>Official Placement & Student Registry Portal. Secured via Departmental Access Keys.</p>
-      </footer>
     </div>
   `;
 
-  // Bind Card Click Events
+  // Bind back button
+  document.getElementById('selector-back').addEventListener('click', () => {
+    currentView = 'home';
+    render();
+  });
+
+  // Bind Selector Card Click Events
   document.getElementById('btn-cse').addEventListener('click', () => {
     currentView = 'cse';
     render();
@@ -165,14 +276,6 @@ function renderHome(container) {
     currentView = 'ece';
     render();
   });
-
-  document.getElementById('btn-calendar').addEventListener('click', () => {
-    currentView = 'calendar';
-    render();
-  });
-
-  // Trigger upcoming calendar event toast
-  triggerUpcomingToast();
 }
 
 // Helper to find and render upcoming event notification toast
@@ -267,7 +370,7 @@ function renderCSE(container) {
 
   // Bind back button
   document.getElementById('cse-back').addEventListener('click', () => {
-    currentView = 'home';
+    currentView = 'registry-selector';
     render();
   });
 
@@ -366,7 +469,7 @@ function renderECE(container) {
 
   // Bind back button
   document.getElementById('ece-back').addEventListener('click', () => {
-    currentView = 'home';
+    currentView = 'registry-selector';
     render();
   });
 
@@ -1492,6 +1595,143 @@ function renderStudent(targetSem) {
   });
   
   document.getElementById('marks-section').innerHTML = marksHtml;
+}
+
+// SPC Password Authorization Modal
+function showSPCPasswordModal() {
+  const modal = document.getElementById('event-modal');
+  const card = document.getElementById('modal-card-content');
+  
+  card.innerHTML = `
+    <div class="modal-header">
+      <h3>SPC Authorization</h3>
+      <button class="modal-close" onclick="hideEventModal()">&times;</button>
+    </div>
+    <form id="spc-login-form" class="modal-form">
+      <div class="form-group">
+        <label for="spc-password">Access Password</label>
+        <div class="password-wrapper">
+          <input type="password" id="spc-password" required placeholder="Enter SPC Access Password" autocomplete="current-password">
+          <button type="button" class="password-toggle" id="spc-toggle-password" aria-label="Toggle password visibility">
+            <svg id="spc-eye-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <svg id="spc-eye-off-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="spc-login-error" class="login-error-msg"></div>
+      <div class="form-submit-group">
+        <button type="button" class="form-cancel-btn" onclick="hideEventModal()">Cancel</button>
+        <button type="submit" class="form-submit-btn">Authorize</button>
+      </div>
+    </form>
+  `;
+  modal.classList.add('active');
+  
+  // Toggle password visibility
+  const toggleBtn = document.getElementById('spc-toggle-password');
+  const passwordInput = document.getElementById('spc-password');
+  const eyeIcon = document.getElementById('spc-eye-icon');
+  const eyeOffIcon = document.getElementById('spc-eye-off-icon');
+  
+  toggleBtn.addEventListener('click', () => {
+    const isPassword = passwordInput.getAttribute('type') === 'password';
+    passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+    eyeIcon.style.display = isPassword ? 'none' : 'block';
+    eyeOffIcon.style.display = isPassword ? 'block' : 'none';
+  });
+  
+  document.getElementById('spc-login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const password = document.getElementById('spc-password').value;
+    const errorMsg = document.getElementById('spc-login-error');
+    
+    // Hash password using sha256 helper
+    const pwHash = await sha256(password);
+    
+    // Compare hashes (spc@5 or spc%405)
+    if (pwHash === '959bb004eb614b51840f0754e29012b627dae2bbb42232bf1751b578a1d6176b' || 
+        pwHash === '74ffa579c6aa545cdcbc5faf5fbfa3c889ee6aa669dd2245e35b64536a2c2c76') {
+      hideEventModal();
+      currentView = 'spc';
+      render();
+    } else {
+      errorMsg.textContent = 'Invalid Access Password.';
+      errorMsg.classList.add('active');
+    }
+  });
+}
+
+// Render SPC Control Panel View
+function renderSPC(container) {
+  container.innerHTML = `
+    <div class="spc-container">
+      <div class="view-header-bar">
+        <button class="btn-back" id="spc-back">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Return to Registry
+        </button>
+        <div class="view-title-wrapper">
+          <h2>SPC Control Panel</h2>
+          <p>Official Placement Coordinator Database</p>
+        </div>
+      </div>
+
+      <!-- Table-like Heading / Metadata Overview -->
+      <div class="table-wrapper" style="margin-bottom: 30px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Resource Name</th>
+              <th>Access Level</th>
+              <th>Target Directory</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight: 600; color: var(--wood-dark);">SPC Master Database</td>
+              <td>Placement Coordinator (Read/Write)</td>
+              <td>Google Cloud Registry</td>
+              <td><span class="status-badge status-p">ACTIVE SYNC</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Embedded Spreadsheet -->
+      <div class="spc-spreadsheet-container">
+        <div class="spc-spreadsheet-header">
+          <span>Google Sheets Live Preview</span>
+          <a href="https://docs.google.com/spreadsheets/d/1eiLJQ0l6RjVPSlxjdivoiY2kcDNdFGhkFpVDHYxCTV0/edit?usp=sharing" target="_blank" class="spc-open-btn">
+            Open in Sheets
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
+        </div>
+        <div class="spc-iframe-wrapper">
+          <iframe src="https://docs.google.com/spreadsheets/d/1eiLJQ0l6RjVPSlxjdivoiY2kcDNdFGhkFpVDHYxCTV0/htmlembed?widget=true&headers=false" width="100%" height="600"></iframe>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Bind back button
+  document.getElementById('spc-back').addEventListener('click', () => {
+    currentView = 'home';
+    render();
+  });
 }
 
 // Initial Boot — verify existing JWT token before rendering

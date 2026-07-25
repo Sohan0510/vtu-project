@@ -86,7 +86,9 @@ body {
 }
 
 #student-app.view-cse,
-#student-app.view-ece {
+#student-app.view-ece,
+#student-app.view-spc,
+#student-app.view-registry-selector {
   max-width: 1100px;
   width: 100%;
 }
@@ -2064,3 +2066,65 @@ tr:hover td {
     justify-content: center !important;
   }
 }
+
+/* ── SPC Control Panel Styles ── */
+.spc-spreadsheet-container {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-premium);
+  overflow: hidden;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.spc-spreadsheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: var(--bg-parchment);
+  border-bottom: 1px solid var(--border-gold);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--wood-dark);
+}
+
+.spc-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: var(--gold-dark);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--border-gold);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background-color: var(--cream-card);
+  transition: all 0.2s ease;
+}
+
+.spc-open-btn:hover {
+  background-color: var(--wood-dark);
+  color: var(--gold-light);
+  border-color: var(--wood-dark);
+}
+
+.spc-iframe-wrapper {
+  position: relative;
+  width: 100%;
+  height: 600px;
+  background-color: #fff;
+}
+
+.spc-iframe-wrapper iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
