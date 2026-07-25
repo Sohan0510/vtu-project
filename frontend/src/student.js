@@ -1669,6 +1669,81 @@ function showSPCPasswordModal() {
 
 // Render SPC Control Panel View
 function renderSPC(container) {
+  // Render toast and waving man at body level to prevent parent container transform scrolling bugs
+  let toast = document.getElementById('spc-toast');
+  let wavingMan = document.getElementById('waving-man');
+  
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'lobby-toast';
+    toast.id = 'spc-toast';
+    document.body.appendChild(toast);
+  }
+  
+  if (!wavingMan) {
+    wavingMan = document.createElement('div');
+    wavingMan.className = 'waving-man-container';
+    wavingMan.id = 'waving-man';
+    document.body.appendChild(wavingMan);
+  }
+
+  // Set fresh content and reset transition classes
+  toast.className = 'lobby-toast';
+  toast.innerHTML = `
+    <div class="toast-content">
+      <div class="toast-icon" style="color: var(--gold-satin);">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <div class="toast-text-wrapper">
+        <div class="toast-heading" style="color: var(--wood-dark); font-size: 1.1rem; font-weight: 700;">Welcome dear SPC</div>
+        <div class="toast-message" style="font-size: 0.8rem; color: var(--text-muted);">I hope you are doing well.</div>
+      </div>
+    </div>
+    <div class="toast-progress-bar" style="background-color: var(--gold-satin); animation-duration: 4s; width: 100%;"></div>
+  `;
+
+  wavingMan.className = 'waving-man-container';
+  wavingMan.innerHTML = `
+    <div class="waving-man-bubble">We ❤️ you SPC!</div>
+    <svg viewBox="0 0 120 64" class="waving-man-svg">
+      <!-- Left Stick Man -->
+      <g class="stick-man-left">
+        <path d="M18 60 C18 42, 42 42, 42 60" fill="var(--wood-light)" />
+        <circle cx="30" cy="26" r="9" fill="var(--gold-light)" stroke="var(--wood-dark)" stroke-width="1.5" />
+        <path class="waving-arm-left" d="M35 34 C40 30, 46 18, 44 16 C42 14, 38 22, 35 30" fill="none" stroke="var(--wood-dark)" stroke-width="2.5" stroke-linecap="round" />
+        <path d="M25 34 C20 38, 16 48, 18 50" fill="none" stroke="var(--wood-dark)" stroke-width="2.5" stroke-linecap="round" />
+        <circle cx="27" cy="24" r="0.8" fill="var(--wood-dark)" />
+        <circle cx="33" cy="24" r="0.8" fill="var(--wood-dark)" />
+        <path d="M27 29 Q30 31 33 29" fill="none" stroke="var(--wood-dark)" stroke-width="1" stroke-linecap="round" />
+      </g>
+
+      <!-- Middle Stick Man -->
+      <g class="stick-man-mid">
+        <path d="M48 60 C48 40, 72 40, 72 60" fill="var(--wood-medium)" />
+        <circle cx="60" cy="24" r="10" fill="var(--gold-light)" stroke="var(--wood-dark)" stroke-width="1.5" />
+        <path class="waving-arm-mid" d="M66 32 C72 28, 80 14, 78 12 C76 10, 70 20, 66 28" fill="none" stroke="var(--wood-dark)" stroke-width="3" stroke-linecap="round" />
+        <path d="M54 32 C48 36, 42 48, 44 50" fill="none" stroke="var(--wood-dark)" stroke-width="3" stroke-linecap="round" />
+        <circle cx="57" cy="22" r="1" fill="var(--wood-dark)" />
+        <circle cx="63" cy="22" r="1" fill="var(--wood-dark)" />
+        <path d="M57 27 Q60 30 63 27" fill="none" stroke="var(--wood-dark)" stroke-width="1.2" stroke-linecap="round" />
+      </g>
+
+      <!-- Right Stick Man -->
+      <g class="stick-man-right">
+        <path d="M78 60 C78 42, 102 42, 102 60" fill="var(--wood-light)" />
+        <circle cx="90" cy="26" r="9" fill="var(--gold-light)" stroke="var(--wood-dark)" stroke-width="1.5" />
+        <path class="waving-arm-right" d="M95 34 C100 30, 106 18, 104 16 C102 14, 98 22, 95 30" fill="none" stroke="var(--wood-dark)" stroke-width="2.5" stroke-linecap="round" />
+        <path d="M85 34 C80 38, 76 48, 78 50" fill="none" stroke="var(--wood-dark)" stroke-width="2.5" stroke-linecap="round" />
+        <circle cx="87" cy="24" r="0.8" fill="var(--wood-dark)" />
+        <circle cx="93" cy="24" r="0.8" fill="var(--wood-dark)" />
+        <path d="M87 29 Q90 31 93 29" fill="none" stroke="var(--wood-dark)" stroke-width="1" stroke-linecap="round" />
+      </g>
+    </svg>
+  `;
+
   container.innerHTML = `
     <div class="spc-container">
       <div class="view-header-bar">
@@ -1687,7 +1762,7 @@ function renderSPC(container) {
 
       <!-- Table-like Heading / Metadata Overview -->
       <div class="table-wrapper" style="margin-bottom: 30px;">
-        <table>
+        <table class="spc-meta-table">
           <thead>
             <tr>
               <th>Resource Name</th>
@@ -1698,10 +1773,10 @@ function renderSPC(container) {
           </thead>
           <tbody>
             <tr>
-              <td style="font-weight: 600; color: var(--wood-dark);">SPC Master Database</td>
-              <td>Placement Coordinator (Read/Write)</td>
-              <td>Google Cloud Registry</td>
-              <td><span class="status-badge status-p">ACTIVE SYNC</span></td>
+              <td data-label="Resource Name" style="font-weight: 600; color: var(--wood-dark);">SPC Master Database</td>
+              <td data-label="Access Level">Placement Coordinator (Read/Write)</td>
+              <td data-label="Target Directory">Google Cloud Registry</td>
+              <td data-label="Status"><span class="status-badge status-p">ACTIVE SYNC</span></td>
             </tr>
           </tbody>
         </table>
@@ -1727,11 +1802,32 @@ function renderSPC(container) {
     </div>
   `;
 
-  // Bind back button
+  // Bind back button and clear absolute body overlays immediately
   document.getElementById('spc-back').addEventListener('click', () => {
+    if (toast) {
+      toast.classList.remove('show');
+      toast.classList.add('hide');
+    }
+    if (wavingMan) {
+      wavingMan.classList.remove('show');
+      wavingMan.classList.add('hide');
+    }
     currentView = 'home';
     render();
   });
+
+  // Trigger login toast alert and waving man for exactly 4 seconds
+  setTimeout(() => {
+    toast.classList.add('show');
+    wavingMan.classList.add('show');
+  }, 150);
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    wavingMan.classList.remove('show');
+    wavingMan.classList.add('hide');
+  }, 4000);
 }
 
 // Initial Boot — verify existing JWT token before rendering

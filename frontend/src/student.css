@@ -2067,7 +2067,11 @@ tr:hover td {
   }
 }
 
-/* ── SPC Control Panel Styles ── */
+/* SPC Control Panel Styles */
+.spc-container {
+  width: 100%;
+}
+
 .spc-spreadsheet-container {
   background-color: var(--cream-card);
   border: 1px solid var(--border-gold);
@@ -2120,11 +2124,194 @@ tr:hover td {
   width: 100%;
   height: 600px;
   background-color: #fff;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .spc-iframe-wrapper iframe {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+/* Mobile responsive styles for SPC Control Panel & General Layout */
+@media (max-width: 640px) {
+  #student-app {
+    padding: 24px 16px !important;
+  }
+
+  /* Center toasts on mobile viewports so they do not clip */
+  .lobby-toast {
+    top: 16px !important;
+    right: 16px !important;
+    left: 16px !important;
+    width: auto !important;
+    transform: translateY(-50px) !important;
+  }
+  .lobby-toast.show {
+    transform: translateY(0) !important;
+  }
+  .lobby-toast.hide {
+    transform: translateY(-50px) !important;
+  }
+
+  .spc-meta-table thead {
+    display: none;
+  }
+  .spc-meta-table, .spc-meta-table tbody, .spc-meta-table tr, .spc-meta-table td {
+    display: block;
+    width: 100%;
+  }
+  .spc-meta-table tr {
+    margin-bottom: 15px;
+    border: 1px solid var(--border-gold);
+    border-radius: var(--radius-md);
+    background-color: var(--cream-card);
+    padding: 8px 12px;
+    box-shadow: var(--shadow-premium);
+  }
+  .spc-meta-table td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+    border: none;
+    border-bottom: 1px dashed var(--border-gold);
+    font-size: 0.9rem;
+    text-align: left;
+    gap: 4px;
+  }
+  .spc-meta-table td:last-child {
+    border-bottom: none;
+  }
+  .spc-meta-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-family: 'Inter', sans-serif;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    margin-right: 0;
+    text-align: left;
+  }
+  
+  .spc-spreadsheet-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    text-align: center;
+  }
+  
+  .spc-iframe-wrapper {
+    height: 450px;
+  }
+}
+
+/* ── Waving Man Animation Styles ── */
+.waving-man-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 180px;
+  height: 120px;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(150px);
+  opacity: 0;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.waving-man-container.show {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.waving-man-container.hide {
+  transform: translateY(150px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.waving-man-svg {
+  width: 140px;
+  height: 80px;
+}
+
+.waving-arm-left {
+  transform-origin: 35px 34px;
+  animation: wave 0.6s ease-in-out infinite;
+  animation-delay: 0.15s;
+}
+
+.waving-arm-mid {
+  transform-origin: 66px 32px;
+  animation: wave 0.6s ease-in-out infinite;
+}
+
+.waving-arm-right {
+  transform-origin: 95px 34px;
+  animation: wave 0.6s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-25deg); }
+}
+
+.waving-man-bubble {
+  background-color: var(--wood-dark);
+  color: var(--gold-light);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 2px;
+  box-shadow: var(--shadow-premium);
+  position: relative;
+  animation: float 2.5s ease-in-out infinite;
+}
+
+.waving-man-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px 4px 0;
+  border-style: solid;
+  border-color: var(--wood-dark) transparent;
+  display: block;
+  width: 0;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Waving man mobile sizing */
+@media (max-width: 640px) {
+  .waving-man-container {
+    bottom: 16px;
+    right: 16px;
+    width: 140px;
+    height: 100px;
+  }
+  .waving-man-svg {
+    width: 110px;
+    height: 60px;
+  }
+  .waving-man-bubble {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+  }
 }
 
