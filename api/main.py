@@ -418,6 +418,25 @@ ADMIN_ID = os.getenv("ADMIN_ID", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 DUMMY_TOKEN = "dummy-admin-jwt-token"
 
+# Dual-storage configuration: Auto-detect if cloud MongoDB URI is configured
+USE_MONGO_FOR_EVENTS = False
+mongo_uri_env = os.getenv("MONGO_URI", "")
+if mongo_uri_env and ("mongodb+srv://" in mongo_uri_env or ("localhost" not in mongo_uri_env and "127.0.0.1" not in mongo_uri_env)):
+    USE_MONGO_FOR_EVENTS = True
+
+# MongoDB collections for events (only connected if needed)
+events_collection = None
+if USE_MONGO_FOR_EVENTS:
+    try:
+        events_collection = db["events"]
+        # Seed events from JSON if collection is empty
+        if events_collection.count_documents({}) == 0:
+            example_events = load_events_from_json()
+            if example_events:
+                events_collection.insert_many(example_events)
+    except Exception:
+        pass
+
 def verify_token(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization Header")
@@ -450,57 +469,94 @@ def verify_admin_token(authorization: Optional[str] = Header(None)):
 
 @app.get("/api/events")
 def get_calendar_events():
-    """Retrieve all calendar events from JSON file."""
+    """Retrieve all calendar events."""
+    if USE_MONGO_FOR_EVENTS and events_collection is not None:
+        try:
+            return list(events_collection.find({}, {"_id": 0}))
+        except Exception:
+            pass
     return load_events_from_json()
 
 @app.post("/api/events")
 def create_calendar_event(req: EventRequest, authorization: Optional[str] = Header(None)):
-    """Create a new calendar event in JSON file."""
+    """Create a new calendar event."""
     verify_token(authorization)
+    event_data = req.dict()
+    
+    if USE_MONGO_FOR_EVENTS and events_collection is not None:
+        try:
+            if events_collection.find_one({"id": req.id}):
+                raise HTTPException(status_code=400, detail="Event already exists")
+            events_collection.insert_one(event_data)
+            event_data.pop("_id", None)
+            return event_data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            
+    # Fallback to local JSON
     events = load_events_from_json()
-    # Check if event already exists
     if any(e.get("id") == req.id for e in events):
         raise HTTPException(status_code=400, detail="Event already exists")
-    
-    event_data = req.dict()
     events.append(event_data)
     if not save_events_to_json(events):
-        raise HTTPException(status_code=500, detail="Failed to save event to file")
+        raise HTTPException(status_code=500, detail="Failed to save event to local file (read-only filesystem)")
     return event_data
 
 @app.put("/api/events")
 def update_calendar_event(req: EventRequest, authorization: Optional[str] = Header(None)):
-    """Update an existing calendar event in JSON file."""
+    """Update an existing calendar event."""
     verify_token(authorization)
-    events = load_events_from_json()
-    
-    found = False
     event_data = req.dict()
+    
+    if USE_MONGO_FOR_EVENTS and events_collection is not None:
+        try:
+            res = events_collection.replace_one({"id": req.id}, event_data)
+            if res.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Event not found")
+            return event_data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            
+    # Fallback to local JSON
+    events = load_events_from_json()
+    found = False
     for idx, e in enumerate(events):
         if e.get("id") == req.id:
             events[idx] = event_data
             found = True
             break
-            
     if not found:
         raise HTTPException(status_code=404, detail="Event not found")
-        
     if not save_events_to_json(events):
-        raise HTTPException(status_code=500, detail="Failed to save updated events to file")
+        raise HTTPException(status_code=500, detail="Failed to save update to local file (read-only filesystem)")
     return event_data
 
 @app.delete("/api/events")
 def delete_calendar_event(req: DeleteEventRequest, authorization: Optional[str] = Header(None)):
-    """Delete a calendar event from JSON file."""
+    """Delete a calendar event."""
     verify_token(authorization)
-    events = load_events_from_json()
     
+    if USE_MONGO_FOR_EVENTS and events_collection is not None:
+        try:
+            res = events_collection.delete_one({"id": req.id})
+            if res.deleted_count == 0:
+                raise HTTPException(status_code=404, detail="Event not found")
+            return {"status": "success", "message": "Event deleted"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            
+    # Fallback to local JSON
+    events = load_events_from_json()
     initial_len = len(events)
     events = [e for e in events if e.get("id") != req.id]
-    
     if len(events) == initial_len:
         raise HTTPException(status_code=404, detail="Event not found")
-        
     if not save_events_to_json(events):
-        raise HTTPException(status_code=500, detail="Failed to save events to file")
+        raise HTTPException(status_code=500, detail="Failed to save deletion to local file (read-only filesystem)")
     return {"status": "success", "message": "Event deleted"}
