@@ -30,9 +30,9 @@
   --cat-academic-txt: #8c6c3a;
   --cat-academic-border: #c5a059;
   
-  --cat-exams-bg: #fdf2f2;
-  --cat-exams-txt: #a12c2c;
-  --cat-exams-border: #ecb2b2;
+  --cat-exams-bg: #fdfaf3;
+  --cat-exams-txt: #8c6c3a;
+  --cat-exams-border: #c5a059;
   
   --cat-holidays-bg: #f0faf1;
   --cat-holidays-txt: #2c723d;
@@ -45,6 +45,22 @@
   --cat-offline-bg: #fff7ed;
   --cat-offline-txt: #7c2d12;
   --cat-offline-border: #ffedd5;
+  
+  --cat-oncampus-bg: #f5f3ff;
+  --cat-oncampus-txt: #5b21b6;
+  --cat-oncampus-border: #ddd6fe;
+  
+  --cat-offcampus-bg: #f0fdfa;
+  --cat-offcampus-txt: #115e59;
+  --cat-offcampus-border: #99f6e4;
+  
+  --cat-oa-bg: #eef2ff;
+  --cat-oa-txt: #3730a3;
+  --cat-oa-border: #c7d2fe;
+  
+  --cat-technical-bg: #fdf2f8;
+  --cat-technical-txt: #9d174d;
+  --cat-technical-border: #fbcfe8;
 
   /* Shadows and Radii */
   --shadow-premium: 0 8px 30px rgba(42, 27, 17, 0.06);
@@ -840,11 +856,12 @@ tr:hover td {
 }
 
 /* Checkbox States */
-.checkbox-academic { background-color: var(--cat-academic-bg); border-color: var(--cat-academic-border); }
 .checkbox-exams { background-color: var(--cat-exams-bg); border-color: var(--cat-exams-border); }
 .checkbox-holidays { background-color: var(--cat-holidays-bg); border-color: var(--cat-holidays-border); }
 .checkbox-online { background-color: var(--cat-online-bg); border-color: var(--cat-online-border); }
 .checkbox-offline { background-color: var(--cat-offline-bg); border-color: var(--cat-offline-border); }
+.checkbox-oncampus { background-color: var(--cat-oncampus-bg); border-color: var(--cat-oncampus-border); }
+.checkbox-offcampus { background-color: var(--cat-offcampus-bg); border-color: var(--cat-offcampus-border); }
 
 .filter-item input:checked + .checkbox-custom::after {
   content: '';
@@ -856,11 +873,12 @@ tr:hover td {
   border-radius: 1px;
 }
 
-#filter-academic:checked + .checkbox-custom::after { background-color: var(--cat-academic-txt); }
 #filter-exams:checked + .checkbox-custom::after { background-color: var(--cat-exams-txt); }
 #filter-holidays:checked + .checkbox-custom::after { background-color: var(--cat-holidays-txt); }
 #filter-online:checked + .checkbox-custom::after { background-color: var(--cat-online-txt); }
 #filter-offline:checked + .checkbox-custom::after { background-color: var(--cat-offline-txt); }
+#filter-oncampus:checked + .checkbox-custom::after { background-color: var(--cat-oncampus-txt); }
+#filter-offcampus:checked + .checkbox-custom::after { background-color: var(--cat-offcampus-txt); }
 
 
 /* Main Calendar Desk styling */
@@ -1070,9 +1088,6 @@ tr:hover td {
 }
 
 /* Event Color Mapping */
-.event-academic { background-color: var(--cat-academic-bg); color: var(--cat-academic-txt); border: 1px solid var(--cat-academic-border); }
-.event-academic .event-dot { background-color: var(--cat-academic-border); }
-
 .event-exams { background-color: var(--cat-exams-bg); color: var(--cat-exams-txt); border: 1px solid var(--cat-exams-border); }
 .event-exams .event-dot { background-color: var(--cat-exams-txt); }
 
@@ -1084,6 +1099,12 @@ tr:hover td {
 
 .event-offline { background-color: var(--cat-offline-bg); color: var(--cat-offline-txt); border: 1px solid var(--cat-offline-border); }
 .event-offline .event-dot { background-color: var(--cat-offline-txt); }
+
+.event-oncampus { background-color: var(--cat-oncampus-bg); color: var(--cat-oncampus-txt); border: 1px solid var(--cat-oncampus-border); }
+.event-oncampus .event-dot { background-color: var(--cat-oncampus-txt); }
+
+.event-offcampus { background-color: var(--cat-offcampus-bg); color: var(--cat-offcampus-txt); border: 1px solid var(--cat-offcampus-border); }
+.event-offcampus .event-dot { background-color: var(--cat-offcampus-txt); }
 
 
 /* ── Modal Dialog Styles ── */
@@ -1416,12 +1437,12 @@ tr:hover td {
 }
 
 /* Drive Format selection & tag styles */
-.format-buttons-group {
+.format-buttons-group, .location-buttons-group {
   display: flex;
   gap: 12px;
 }
 
-.format-btn {
+.format-btn, .location-btn {
   flex: 1;
   padding: 10px;
   border: 1px solid var(--border-gold);
@@ -1435,7 +1456,7 @@ tr:hover td {
   outline: none;
 }
 
-.format-btn:hover {
+.format-btn:hover, .location-btn:hover {
   border-color: var(--gold-satin);
   color: var(--text-primary);
 }
@@ -1450,6 +1471,55 @@ tr:hover td {
   background-color: var(--cat-offline-bg);
   color: var(--cat-offline-txt);
   border-color: var(--cat-offline-border);
+}
+
+.location-btn.active[data-value="oncampus"] {
+  background-color: var(--cat-oncampus-bg);
+  color: var(--cat-oncampus-txt);
+  border-color: var(--cat-oncampus-border);
+}
+
+.location-btn.active[data-value="offcampus"] {
+  background-color: var(--cat-offcampus-bg);
+  color: var(--cat-offcampus-txt);
+  border-color: var(--cat-offcampus-border);
+}
+
+/* Subtypes selection styling */
+.subtypes-buttons-group {
+  display: flex;
+  gap: 12px;
+}
+
+.subtype-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-md);
+  background-color: var(--cream-card);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.subtype-btn:hover {
+  border-color: var(--gold-satin);
+  color: var(--text-primary);
+}
+
+.subtype-btn.active[data-value="OA"] {
+  background-color: var(--cat-oa-bg);
+  color: var(--cat-oa-txt);
+  border-color: var(--cat-oa-border);
+}
+
+.subtype-btn.active[data-value="Technical"] {
+  background-color: var(--cat-technical-bg);
+  color: var(--cat-technical-txt);
+  border-color: var(--cat-technical-border);
 }
 
 /* Event Pill Mode Tags */
@@ -1475,6 +1545,18 @@ tr:hover td {
   border: 1px solid var(--cat-offline-border);
 }
 
+.pill-mode-tag.mode-oncampus {
+  background-color: var(--cat-oncampus-bg);
+  color: var(--cat-oncampus-txt);
+  border: 1px solid var(--cat-oncampus-border);
+}
+
+.pill-mode-tag.mode-offcampus {
+  background-color: var(--cat-offcampus-bg);
+  color: var(--cat-offcampus-txt);
+  border: 1px solid var(--cat-offcampus-border);
+}
+
 /* Modal header Mode Badge */
 .modal-mode-badge {
   font-size: 0.7rem;
@@ -1482,7 +1564,6 @@ tr:hover td {
   letter-spacing: 0.08em;
   padding: 3px 10px;
   border-radius: var(--radius-lg);
-  margin-left: 10px;
   display: inline-block;
 }
 
@@ -1496,6 +1577,58 @@ tr:hover td {
   background-color: var(--cat-offline-bg);
   color: var(--cat-offline-txt);
   border: 1px solid var(--cat-offline-border);
+}
+
+.modal-mode-badge.mode-oncampus {
+  background-color: var(--cat-oncampus-bg);
+  color: var(--cat-oncampus-txt);
+  border: 1px solid var(--cat-oncampus-border);
+}
+
+.modal-mode-badge.mode-offcampus {
+  background-color: var(--cat-offcampus-bg);
+  color: var(--cat-offcampus-txt);
+  border: 1px solid var(--cat-offcampus-border);
+}
+
+/* Modal header Subtype Badge */
+.modal-subtype-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: var(--radius-lg);
+  display: inline-block;
+}
+
+/* Modal Header Tags Wrapper */
+.modal-header-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-left: 10px;
+  margin-right: auto;
+}
+
+/* Agenda Card Tags Wrapper */
+.agenda-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.modal-subtype-badge.subtype-oa {
+  background-color: var(--cat-oa-bg);
+  color: var(--cat-oa-txt);
+  border: 1px solid var(--cat-oa-border);
+}
+
+.modal-subtype-badge.subtype-technical {
+  background-color: var(--cat-technical-bg);
+  color: var(--cat-technical-txt);
+  border: 1px solid var(--cat-technical-border);
 }
 
 /* Toast Notification */
@@ -1685,17 +1818,19 @@ tr:hover td {
 }
 
 /* Agenda Card left highlights for visual categories */
-.agenda-card.event-academic { border-left: 4px solid var(--cat-academic-border); }
 .agenda-card.event-exams { border-left: 4px solid var(--cat-exams-border); }
 .agenda-card.event-holidays { border-left: 4px solid var(--cat-holidays-border); }
 .agenda-card.event-online { border-left: 4px solid var(--cat-online-border); }
 .agenda-card.event-offline { border-left: 4px solid var(--cat-offline-border); }
+.agenda-card.event-oncampus { border-left: 4px solid var(--cat-oncampus-border); }
+.agenda-card.event-offcampus { border-left: 4px solid var(--cat-offcampus-border); }
 
-.agenda-card:hover.event-academic { border-left-width: 6px; }
 .agenda-card:hover.event-exams { border-left-width: 6px; }
 .agenda-card:hover.event-holidays { border-left-width: 6px; }
 .agenda-card:hover.event-online { border-left-width: 6px; }
 .agenda-card:hover.event-offline { border-left-width: 6px; }
+.agenda-card:hover.event-oncampus { border-left-width: 6px; }
+.agenda-card:hover.event-offcampus { border-left-width: 6px; }
 
 .agenda-card-header {
   display: flex;
@@ -1712,11 +1847,12 @@ tr:hover td {
   letter-spacing: 0.02em;
 }
 
-.agenda-category-badge.category-academic { background-color: var(--cat-academic-bg); color: var(--cat-academic-txt); border: 1px solid var(--cat-academic-border); }
 .agenda-category-badge.category-exams { background-color: var(--cat-exams-bg); color: var(--cat-exams-txt); border: 1px solid var(--cat-exams-border); }
 .agenda-category-badge.category-holidays { background-color: var(--cat-holidays-bg); color: var(--cat-holidays-txt); border: 1px solid var(--cat-holidays-border); }
 .agenda-category-badge.category-online { background-color: var(--cat-online-bg); color: var(--cat-online-txt); border: 1px solid var(--cat-online-border); }
 .agenda-category-badge.category-offline { background-color: var(--cat-offline-bg); color: var(--cat-offline-txt); border: 1px solid var(--cat-offline-border); }
+.agenda-category-badge.category-oncampus { background-color: var(--cat-oncampus-bg); color: var(--cat-oncampus-txt); border: 1px solid var(--cat-oncampus-border); }
+.agenda-category-badge.category-offcampus { background-color: var(--cat-offcampus-bg); color: var(--cat-offcampus-txt); border: 1px solid var(--cat-offcampus-border); }
 
 .agenda-mode-tag {
   font-size: 0.65rem;
@@ -1725,18 +1861,54 @@ tr:hover td {
   padding: 2px 8px;
   border-radius: 4px;
   letter-spacing: 0.03em;
+  display: inline-block;
 }
 
 .agenda-mode-tag.mode-online {
-  background-color: #e0f2fe;
-  color: #0369a1;
-  border: 1px solid #bae6fd;
+  background-color: var(--cat-online-bg);
+  color: var(--cat-online-txt);
+  border: 1px solid var(--cat-online-border);
 }
 
 .agenda-mode-tag.mode-offline {
-  background-color: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background-color: var(--cat-offline-bg);
+  color: var(--cat-offline-txt);
+  border: 1px solid var(--cat-offline-border);
+}
+
+.agenda-mode-tag.mode-oncampus {
+  background-color: var(--cat-oncampus-bg);
+  color: var(--cat-oncampus-txt);
+  border: 1px solid var(--cat-oncampus-border);
+}
+
+.agenda-mode-tag.mode-offcampus {
+  background-color: var(--cat-offcampus-bg);
+  color: var(--cat-offcampus-txt);
+  border: 1px solid var(--cat-offcampus-border);
+}
+
+/* Agenda Subtype tags */
+.agenda-subtype-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+  display: inline-block;
+}
+
+.agenda-subtype-tag.subtype-oa {
+  background-color: var(--cat-oa-bg);
+  color: var(--cat-oa-txt);
+  border: 1px solid var(--cat-oa-border);
+}
+
+.agenda-subtype-tag.subtype-technical {
+  background-color: var(--cat-technical-bg);
+  color: var(--cat-technical-txt);
+  border: 1px solid var(--cat-technical-border);
 }
 
 .agenda-event-title {
@@ -1751,6 +1923,31 @@ tr:hover td {
   color: var(--text-primary);
   line-height: 1.45;
   margin: 0;
+}
+
+/* Description Formatting Styles */
+.desc-text-line {
+  margin: 0 0 6px 0;
+  line-height: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+.desc-empty-line {
+  height: 0.8em;
+}
+
+.desc-list {
+  margin: 6px 0 10px 20px;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.desc-list li {
+  margin-bottom: 6px;
+  line-height: inherit;
+  font-size: inherit;
+  color: inherit;
 }
 
 .agenda-card-actions {
@@ -1928,47 +2125,70 @@ tr:hover td {
     margin-left: 2px !important;
   }
 
-  /* Hide textual event representation on grid cell */
+  /* Show textual event representation on grid cell with clean ellipsis */
   .calendar-day-cell .calendar-event-pill {
-    width: 6px !important;
-    height: 6px !important;
-    border-radius: 50% !important;
-    padding: 0 !important;
-    margin: 1px !important;
-    display: inline-block !important;
-    min-width: 6px !important;
-    border: none !important;
+    width: calc(100% - 4px) !important;
+    height: 15px !important;
+    border-radius: 3px !important;
+    padding: 1px 4px !important;
+    margin: 2px auto 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
     box-shadow: none !important;
     transform: none !important;
+    overflow: hidden !important;
   }
 
-  .calendar-day-cell .calendar-event-pill .event-text,
-  .calendar-day-cell .calendar-event-pill .pill-mode-tag,
+  .calendar-day-cell .calendar-event-pill .event-text {
+    display: block !important;
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+
   .calendar-day-cell .calendar-event-pill .event-dot {
     display: none !important;
   }
 
-  /* Horizontal wrapper for dots, aligned left */
-  .calendar-day-cell .day-events {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-    justify-content: flex-start !important;
-    align-items: center !important;
-    gap: 3px !important;
-    width: 100% !important;
-    height: auto !important;
-    margin-top: 4px !important;
-    margin-left: 2px !important;
-    margin-bottom: 0 !important;
+  .calendar-day-cell .calendar-event-pill .pill-mode-tag {
+    display: none !important;
   }
 
-  /* Map event background colors to dots */
-  .calendar-day-cell .calendar-event-pill.event-academic { background-color: var(--cat-academic-border) !important; }
-  .calendar-day-cell .calendar-event-pill.event-exams { background-color: var(--cat-exams-border) !important; }
-  .calendar-day-cell .calendar-event-pill.event-holidays { background-color: var(--cat-holidays-border) !important; }
-  .calendar-day-cell .calendar-event-pill.event-online { background-color: var(--cat-online-txt) !important; }
-  .calendar-day-cell .calendar-event-pill.event-offline { background-color: var(--cat-offline-txt) !important; }
+  /* Stack events vertically on mobile instead of inline row */
+  .calendar-day-cell .day-events {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    gap: 2px !important;
+    width: 100% !important;
+    height: auto !important;
+    margin-top: 2px !important;
+    margin-left: 0 !important;
+    margin-bottom: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Map event background and text colors to mobile pills */
+  .calendar-day-cell .calendar-event-pill.event-exams {
+    background-color: var(--cat-exams-bg) !important;
+    color: var(--cat-exams-txt) !important;
+    border: 1px solid var(--cat-exams-border) !important;
+  }
+  .calendar-day-cell .calendar-event-pill.event-holidays {
+    background-color: var(--cat-holidays-bg) !important;
+    color: var(--cat-holidays-txt) !important;
+    border: 1px solid var(--cat-holidays-border) !important;
+  }
 
   /* Toolbar adjustments */
   .calendar-toolbar {
