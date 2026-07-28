@@ -391,13 +391,39 @@ class DeleteEventRequest(BaseModel):
     id: int
 
 # JSON File Paths for events
+# On Vercel, the project directory is read-only. We use /tmp as writable storage.
+IS_VERCEL = os.getenv("VERCEL", "") == "1"
 EVENTS_JSON_PATH = os.path.join(BASE_DIR, "calendar_events.json")
 EVENTS_EXAMPLE_PATH = os.path.join(BASE_DIR, "calendar_events_example.json")
+EVENTS_TMP_PATH = "/tmp/calendar_events.json" if IS_VERCEL else None
+
+def _get_read_path():
+    """Return the best available path for reading events."""
+    # On Vercel: prefer /tmp copy (has latest edits), then repo file, then example
+    if EVENTS_TMP_PATH and os.path.exists(EVENTS_TMP_PATH):
+        return EVENTS_TMP_PATH
+    if os.path.exists(EVENTS_JSON_PATH):
+        return EVENTS_JSON_PATH
+    return EVENTS_EXAMPLE_PATH
+
+def _seed_tmp_if_needed():
+    """On Vercel, copy repo JSON into /tmp on first access so it's writable."""
+    if EVENTS_TMP_PATH and not os.path.exists(EVENTS_TMP_PATH):
+        source = EVENTS_JSON_PATH if os.path.exists(EVENTS_JSON_PATH) else EVENTS_EXAMPLE_PATH
+        if os.path.exists(source):
+            try:
+                import shutil
+                shutil.copy2(source, EVENTS_TMP_PATH)
+            except Exception:
+                pass
+
+# Seed /tmp on startup if running on Vercel
+if IS_VERCEL:
+    _seed_tmp_if_needed()
 
 def load_events_from_json():
-    # Fallback to example file if local calendar_events.json does not exist yet
-    path = EVENTS_JSON_PATH if os.path.exists(EVENTS_JSON_PATH) else EVENTS_EXAMPLE_PATH
-    if os.path.exists(path):
+    path = _get_read_path()
+    if path and os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -406,8 +432,10 @@ def load_events_from_json():
     return []
 
 def save_events_to_json(events):
+    # On Vercel, write to /tmp; locally, write to project dir
+    target = EVENTS_TMP_PATH if IS_VERCEL else EVENTS_JSON_PATH
     try:
-        with open(EVENTS_JSON_PATH, "w", encoding="utf-8") as f:
+        with open(target, "w", encoding="utf-8") as f:
             json.dump(events, f, indent=2)
         return True
     except Exception:
