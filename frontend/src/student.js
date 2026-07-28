@@ -1030,6 +1030,7 @@ function renderAgendaList() {
             await fetchEvents();
             generateCalendarGrid();
             generateMiniCalendar();
+            renderAgendaList();
           } catch (err) {
             alert('Failed to delete event. Please check your connection.');
             btn.disabled = false;
@@ -1136,6 +1137,7 @@ function showEventDetailModalAdmin(event) {
         hideEventModal();
         generateCalendarGrid();
         generateMiniCalendar();
+        renderAgendaList();
       } catch (err) {
         alert('Failed to delete event. Please check your connection.');
         btn.disabled = false;
@@ -1157,7 +1159,7 @@ function showEditEventModal(event) {
     <form id="edit-event-form" class="modal-form">
       <div class="form-group">
         <label for="form-title">Company Name</label>
-        <input type="text" id="form-title" value="${event.title}" required placeholder="e.g. Google India">
+        <input type="text" id="form-title" value="${escapeHTML(event.title)}" required placeholder="e.g. Google India">
       </div>
       <div class="form-group">
         <label for="form-type">Update Type</label>
@@ -1181,7 +1183,7 @@ function showEditEventModal(event) {
       </div>
       <div class="form-group">
         <label for="form-desc">Details / Description</label>
-        <textarea id="form-desc" rows="4" required placeholder="Describe placement criteria, eligibility, compensation...">${event.desc}</textarea>
+        <textarea id="form-desc" rows="4" required placeholder="Describe placement criteria, eligibility, compensation...">${escapeHTML(event.desc)}</textarea>
       </div>
       <div class="form-submit-group">
         <button type="button" class="form-cancel-btn" id="form-cancel-edit">Cancel</button>
@@ -1249,6 +1251,7 @@ function showEditEventModal(event) {
       hideEventModal();
       generateCalendarGrid();
       generateMiniCalendar();
+      renderAgendaList();
     } catch (err) {
       alert('Failed to update event. Please try again.');
       submitBtn.disabled = false;
@@ -1359,6 +1362,7 @@ function showCreateEventModal(dateStr) {
       hideEventModal();
       generateCalendarGrid();
       generateMiniCalendar();
+      renderAgendaList();
     } catch (err) {
       alert('Failed to create event. Please try again.');
       submitBtn.disabled = false;
