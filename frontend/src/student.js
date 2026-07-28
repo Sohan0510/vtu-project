@@ -1386,7 +1386,11 @@ function showEditEventModal(event) {
         body: JSON.stringify(updatedEvent)
       });
       
-      if (!res.ok) throw new Error('Update failed');
+      if (!res.ok) {
+        let errData = {};
+        try { errData = await res.json(); } catch(e) {}
+        throw new Error(errData.detail || `Server returned ${res.status}`);
+      }
       
       await fetchEvents();
       hideEventModal();
@@ -1394,7 +1398,7 @@ function showEditEventModal(event) {
       generateMiniCalendar();
       renderAgendaList();
     } catch (err) {
-      alert('Failed to update event. Please try again.');
+      alert('Failed to update event: ' + err.message);
       submitBtn.disabled = false;
       submitBtn.textContent = 'Save Changes';
     }
@@ -1550,7 +1554,11 @@ function showCreateEventModal(dateStr) {
         body: JSON.stringify(newEvent)
       });
       
-      if (!res.ok) throw new Error('Post failed');
+      if (!res.ok) {
+        let errData = {};
+        try { errData = await res.json(); } catch(e) {}
+        throw new Error(errData.detail || `Server returned ${res.status}`);
+      }
       
       await fetchEvents();
       hideEventModal();
@@ -1558,7 +1566,7 @@ function showCreateEventModal(dateStr) {
       generateMiniCalendar();
       renderAgendaList();
     } catch (err) {
-      alert('Failed to create event. Please try again.');
+      alert('Failed to create event: ' + err.message);
       submitBtn.disabled = false;
       submitBtn.textContent = 'Post Update';
     }
@@ -1631,39 +1639,42 @@ function showLoginModal() {
     errorMsg.classList.remove('active');
     
     try {
-      // Hash password using sha256 helper
-      const pwHash = await sha256(password);
+      // Try server-side authentication first (returns real JWT for API calls)
+      const res = await fetch(`${API}/api/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, password })
+      });
       
-      // Client-side authentication using SHA-256 (for "Placements%2019")
-      if (id === 'mdadmin' && pwHash === 'cd86e1bc9f8fcb8b62abfea747668a1fd7bd5fbb7acc40acf102d31675f7960f') {
-        // Store dummy token securely in sessionStorage
-        sessionStorage.setItem('adminToken', 'dummy-admin-jwt-token');
+      const data = await res.json();
+      
+      if (res.ok && data.token) {
+        // Store real JWT token — this is required for event CRUD operations
+        sessionStorage.setItem('adminToken', data.token);
         isAdmin = true;
         hideEventModal();
         render();
       } else {
-        // Try fallback to server side auth just in case there's another setup
-        const res = await fetch(`${API}/api/auth`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, password })
-        });
-        
-        const data = await res.json();
-        
-        if (res.ok && data.token) {
-          sessionStorage.setItem('adminToken', data.token);
+        errorMsg.textContent = data.detail || 'Invalid Admin ID or Password.';
+        errorMsg.classList.add('active');
+      }
+    } catch (err) {
+      // Server unreachable — fallback to client-side hash check for UI-only admin access
+      try {
+        const pwHash = await sha256(password);
+        if (id === 'mdadmin' && pwHash === 'cd86e1bc9f8fcb8b62abfea747668a1fd7bd5fbb7acc40acf102d31675f7960f') {
+          sessionStorage.setItem('adminToken', 'dummy-admin-jwt-token');
           isAdmin = true;
           hideEventModal();
           render();
         } else {
-          errorMsg.textContent = data.detail || 'Invalid Admin ID or Password.';
+          errorMsg.textContent = 'Invalid Admin ID or Password.';
           errorMsg.classList.add('active');
         }
+      } catch {
+        errorMsg.textContent = 'Authentication server is offline.';
+        errorMsg.classList.add('active');
       }
-    } catch (err) {
-      errorMsg.textContent = 'Invalid Admin ID or Password or authentication server offline.';
-      errorMsg.classList.add('active');
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Authenticate';
