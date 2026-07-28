@@ -12,13 +12,14 @@ let isAdmin = false;
 let currentCalendarDate = new Date();
 let selectedCalendarDate = new Date();
 
-// Calendar Filter States (Online & Offline drives added)
+// Calendar Filter States (Online, Offline, On-Campus & Off-Campus drives)
 const calendarFilters = {
-  academic: true,
   exams: true,
   holidays: true,
   online: true,
-  offline: true
+  offline: true,
+  oncampus: true,
+  offcampus: true
 };
 
 // XSS Prevention Utility
@@ -30,6 +31,45 @@ function escapeHTML(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Formats description text into HTML, converting bullet points to list tags and preserving newlines
+function formatEventDescription(desc) {
+  if (!desc) return '';
+  const escaped = escapeHTML(desc);
+  const lines = escaped.split(/\r?\n/);
+  
+  let html = [];
+  let inList = false;
+  
+  for (let line of lines) {
+    const trimmed = line.trim();
+    // Match bullet points starting with -, *, +, or • followed by one or more spaces
+    const listMatch = trimmed.match(/^([-\*\+•])\s+(.+)$/);
+    
+    if (listMatch) {
+      if (!inList) {
+        html.push('<ul class="desc-list">');
+        inList = true;
+      }
+      html.push(`<li>${listMatch[2]}</li>`);
+    } else {
+      if (inList) {
+        html.push('</ul>');
+        inList = false;
+      }
+      if (trimmed === '') {
+        html.push('<div class="desc-empty-line"></div>');
+      } else {
+        // Keep original line spacing and indentation by using line instead of trimmed
+        html.push(`<p class="desc-text-line">${line}</p>`);
+      }
+    }
+  }
+  if (inList) {
+    html.push('</ul>');
+  }
+  return html.join('');
 }
 
 // Helper for secure client-side hashing
@@ -273,8 +313,7 @@ function renderRegistrySelector(container) {
   });
 
   document.getElementById('btn-ece').addEventListener('click', () => {
-    currentView = 'ece';
-    render();
+    window.location.href = 'https://rvitm-ece-placement.vercel.app/';
   });
 }
 
@@ -593,11 +632,6 @@ function renderCalendar(container) {
           <div class="calendar-filters">
             <h3>My Calendars</h3>
             <label class="filter-item">
-              <input type="checkbox" id="filter-academic" ${calendarFilters.academic ? 'checked' : ''}>
-              <span class="checkbox-custom checkbox-academic"></span>
-              Placement Drives
-            </label>
-            <label class="filter-item">
               <input type="checkbox" id="filter-exams" ${calendarFilters.exams ? 'checked' : ''}>
               <span class="checkbox-custom checkbox-exams"></span>
               Interviews & Tests
@@ -616,6 +650,16 @@ function renderCalendar(container) {
               <input type="checkbox" id="filter-offline" ${calendarFilters.offline ? 'checked' : ''}>
               <span class="checkbox-custom checkbox-offline"></span>
               Offline Drives
+            </label>
+            <label class="filter-item">
+              <input type="checkbox" id="filter-oncampus" ${calendarFilters.oncampus ? 'checked' : ''}>
+              <span class="checkbox-custom checkbox-oncampus"></span>
+              On-Campus Drives
+            </label>
+            <label class="filter-item">
+              <input type="checkbox" id="filter-offcampus" ${calendarFilters.offcampus ? 'checked' : ''}>
+              <span class="checkbox-custom checkbox-offcampus"></span>
+              Off-Campus Drives
             </label>
           </div>
         </aside>
@@ -705,10 +749,11 @@ function renderCalendar(container) {
   }
 
   // Bind checkbox filter change events
-  ['academic', 'exams', 'holidays', 'online', 'offline'].forEach(key => {
-    document.getElementById(`filter-${key}`).addEventListener('change', (e) => {
+  ['exams', 'holidays', 'online', 'offline', 'oncampus', 'offcampus'].forEach(key => {
+    document.getElementById(`filter-${key}`)?.addEventListener('change', (e) => {
       calendarFilters[key] = e.target.checked;
       generateCalendarGrid();
+      renderAgendaList();
     });
   });
 
@@ -721,7 +766,6 @@ function renderCalendar(container) {
 // Helper to translate event types to human labels
 function getCategoryLabel(type) {
   const labels = {
-    academic: 'Placement Drive',
     exams: 'Interviews & Tests',
     holidays: 'Holidays & Breaks'
   };
@@ -843,17 +887,18 @@ function generateCalendarGrid() {
       if (!calendarFilters[ev.type]) return false;
       if (ev.mode === 'online' && !calendarFilters.online) return false;
       if (ev.mode === 'offline' && !calendarFilters.offline) return false;
+      if (ev.location === 'oncampus' && !calendarFilters.oncampus) return false;
+      if (ev.location === 'offcampus' && !calendarFilters.offcampus) return false;
       return true;
     });
     
     if (events.length > 0) {
       cellContent += `<div class="day-events">`;
       events.forEach(ev => {
-        const modeTag = ev.mode ? ` <span class="pill-mode-tag mode-${ev.mode}">${ev.mode}</span>` : '';
         cellContent += `
           <div class="calendar-event-pill event-${ev.type}" data-event-id="${ev.id}">
             <span class="event-dot"></span>
-            <span class="event-text">${escapeHTML(ev.title)}${modeTag}</span>
+            <span class="event-text">${escapeHTML(ev.title)}</span>
           </div>
         `;
       });
@@ -931,6 +976,8 @@ function renderAgendaList() {
     if (!calendarFilters[ev.type]) return false;
     if (ev.mode === 'online' && !calendarFilters.online) return false;
     if (ev.mode === 'offline' && !calendarFilters.offline) return false;
+    if (ev.location === 'oncampus' && !calendarFilters.oncampus) return false;
+    if (ev.location === 'offcampus' && !calendarFilters.offcampus) return false;
     return true;
   });
 
@@ -963,15 +1010,26 @@ function renderAgendaList() {
   } else {
     events.forEach(ev => {
       const modeTag = ev.mode ? `<span class="agenda-mode-tag mode-${ev.mode}">${ev.mode.toUpperCase()}</span>` : '';
+      const locationTag = ev.location ? `<span class="agenda-mode-tag mode-${ev.location}">${ev.location === 'oncampus' ? 'ON-CAMPUS' : 'OFF-CAMPUS'}</span>` : '';
+      let subtypeTags = '';
+      if (ev.subtypes && Array.isArray(ev.subtypes)) {
+        ev.subtypes.forEach(sub => {
+          subtypeTags += `<span class="agenda-subtype-tag subtype-${sub.toLowerCase()}">${sub.toUpperCase()}</span>`;
+        });
+      }
       html += `
         <div class="agenda-card event-${ev.type}" data-event-id="${ev.id}">
           <div class="agenda-card-header">
             <span class="agenda-category-badge category-${ev.type}">${getCategoryLabel(ev.type)}</span>
-            ${modeTag}
+            <div class="agenda-card-tags">
+              ${modeTag}
+              ${locationTag}
+              ${subtypeTags}
+            </div>
           </div>
           <div class="agenda-card-body">
             <h4 class="agenda-event-title">${escapeHTML(ev.title)}</h4>
-            <p class="agenda-event-desc">${escapeHTML(ev.desc)}</p>
+            <div class="agenda-event-desc">${formatEventDescription(ev.desc)}</div>
           </div>
           ${isAdmin ? `
             <div class="agenda-card-actions">
@@ -1068,16 +1126,27 @@ function showEventDetailModalVisitor(event) {
   const dateStr = dateObj.toLocaleDateString('en-US', options);
   
   const modeBadge = event.mode ? `<span class="modal-mode-badge mode-${event.mode}">${event.mode.toUpperCase()}</span>` : '';
+  const locationBadge = event.location ? `<span class="modal-mode-badge mode-${event.location}">${event.location === 'oncampus' ? 'ON-CAMPUS' : 'OFF-CAMPUS'}</span>` : '';
+  let subtypeBadges = '';
+  if (event.subtypes && Array.isArray(event.subtypes)) {
+    event.subtypes.forEach(sub => {
+      subtypeBadges += `<span class="modal-subtype-badge subtype-${sub.toLowerCase()}">${sub.toUpperCase()}</span>`;
+    });
+  }
   
   card.innerHTML = `
     <div class="modal-header">
       <span class="modal-category event-${event.type}">${getCategoryLabel(event.type)}</span>
-      ${modeBadge}
+      <div class="modal-header-tags">
+        ${modeBadge}
+        ${locationBadge}
+        ${subtypeBadges}
+      </div>
       <button class="modal-close" onclick="hideEventModal()">&times;</button>
     </div>
     <h3 class="modal-title">${escapeHTML(event.title)}</h3>
     <div class="modal-date">${dateStr}</div>
-    <p class="modal-desc">${escapeHTML(event.desc)}</p>
+    <div class="modal-desc">${formatEventDescription(event.desc)}</div>
   `;
   modal.classList.add('active');
 }
@@ -1093,16 +1162,27 @@ function showEventDetailModalAdmin(event) {
   const dateStr = dateObj.toLocaleDateString('en-US', options);
   
   const modeBadge = event.mode ? `<span class="modal-mode-badge mode-${event.mode}">${event.mode.toUpperCase()}</span>` : '';
+  const locationBadge = event.location ? `<span class="modal-mode-badge mode-${event.location}">${event.location === 'oncampus' ? 'ON-CAMPUS' : 'OFF-CAMPUS'}</span>` : '';
+  let subtypeBadges = '';
+  if (event.subtypes && Array.isArray(event.subtypes)) {
+    event.subtypes.forEach(sub => {
+      subtypeBadges += `<span class="modal-subtype-badge subtype-${sub.toLowerCase()}">${sub.toUpperCase()}</span>`;
+    });
+  }
   
   card.innerHTML = `
     <div class="modal-header">
       <span class="modal-category event-${event.type}">${getCategoryLabel(event.type)}</span>
-      ${modeBadge}
+      <div class="modal-header-tags">
+        ${modeBadge}
+        ${locationBadge}
+        ${subtypeBadges}
+      </div>
       <button class="modal-close" onclick="hideEventModal()">&times;</button>
     </div>
     <h3 class="modal-title">${escapeHTML(event.title)}</h3>
     <div class="modal-date">${dateStr}</div>
-    <p class="modal-desc">${escapeHTML(event.desc)}</p>
+    <div class="modal-desc">${formatEventDescription(event.desc)}</div>
     <div class="modal-actions">
       <button class="modal-btn edit-btn" id="modal-edit-btn">Edit Update</button>
       <button class="modal-btn delete-btn" id="modal-delete-btn">Delete Update</button>
@@ -1147,6 +1227,7 @@ function showEventDetailModalAdmin(event) {
 
 // Edit Event Modal Form
 function showEditEventModal(event) {
+  const modal = document.getElementById('event-modal');
   const card = document.getElementById('modal-card-content');
   
   card.innerHTML = `
@@ -1162,18 +1243,33 @@ function showEditEventModal(event) {
       <div class="form-group">
         <label for="form-type">Update Type</label>
         <select id="form-type" required>
-          <option value="academic" ${event.type === 'academic' ? 'selected' : ''}>Placement Drive</option>
           <option value="exams" ${event.type === 'exams' ? 'selected' : ''}>Interviews & Tests</option>
           <option value="holidays" ${event.type === 'holidays' ? 'selected' : ''}>Holidays & Breaks</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Drive Format (Optional)</label>
+        <label>Drive Format</label>
         <div class="format-buttons-group">
           <button type="button" class="format-btn ${event.mode === 'online' ? 'active' : ''}" id="format-btn-online" data-value="online">Online</button>
           <button type="button" class="format-btn ${event.mode === 'offline' ? 'active' : ''}" id="format-btn-offline" data-value="offline">Offline</button>
         </div>
         <input type="hidden" id="form-mode" value="${event.mode || ''}">
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <div class="location-buttons-group">
+          <button type="button" class="location-btn ${event.location === 'oncampus' ? 'active' : ''}" id="location-btn-oncampus" data-value="oncampus">On-Campus</button>
+          <button type="button" class="location-btn ${event.location === 'offcampus' ? 'active' : ''}" id="location-btn-offcampus" data-value="offcampus">Off-Campus</button>
+        </div>
+        <input type="hidden" id="form-location" value="${event.location || ''}">
+      </div>
+      <div class="form-group">
+        <label>Rounds</label>
+        <div class="subtypes-buttons-group">
+          <button type="button" class="subtype-btn" data-value="OA">OA</button>
+          <button type="button" class="subtype-btn" data-value="Technical">Technical</button>
+        </div>
+        <input type="hidden" id="form-subtypes" value="">
       </div>
       <div class="form-group">
         <label for="form-date">Scheduled Date</label>
@@ -1190,6 +1286,8 @@ function showEditEventModal(event) {
     </form>
   `;
   
+  if (modal) modal.classList.add('active');
+  
   // Format buttons logic
   const modeInput = document.getElementById('form-mode');
   const onlineBtn = document.getElementById('format-btn-online');
@@ -1200,15 +1298,53 @@ function showEditEventModal(event) {
       btn.classList.remove('active');
       modeInput.value = '';
     } else {
-      onlineBtn.classList.remove('active');
-      offlineBtn.classList.remove('active');
+      [onlineBtn, offlineBtn].forEach(b => b?.classList.remove('active'));
       btn.classList.add('active');
       modeInput.value = value;
     }
   };
   
-  onlineBtn.addEventListener('click', () => handleFormatClick(onlineBtn, 'online'));
-  offlineBtn.addEventListener('click', () => handleFormatClick(offlineBtn, 'offline'));
+  if (onlineBtn) onlineBtn.addEventListener('click', () => handleFormatClick(onlineBtn, 'online'));
+  if (offlineBtn) offlineBtn.addEventListener('click', () => handleFormatClick(offlineBtn, 'offline'));
+  
+  // Location buttons logic
+  const locationInput = document.getElementById('form-location');
+  const oncampusBtn = document.getElementById('location-btn-oncampus');
+  const offcampusBtn = document.getElementById('location-btn-offcampus');
+  
+  const handleLocationClick = (btn, value) => {
+    if (btn.classList.contains('active')) {
+      btn.classList.remove('active');
+      locationInput.value = '';
+    } else {
+      [oncampusBtn, offcampusBtn].forEach(b => b?.classList.remove('active'));
+      btn.classList.add('active');
+      locationInput.value = value;
+    }
+  };
+  
+  if (oncampusBtn) oncampusBtn.addEventListener('click', () => handleLocationClick(oncampusBtn, 'oncampus'));
+  if (offcampusBtn) offcampusBtn.addEventListener('click', () => handleLocationClick(offcampusBtn, 'offcampus'));
+  
+  // Subtypes multi-select logic
+  const subtypesInput = document.getElementById('form-subtypes');
+  const subtypeButtons = card.querySelectorAll('.subtype-btn');
+  const initialSubtypes = event.subtypes || [];
+  
+  subtypeButtons.forEach(btn => {
+    const val = btn.getAttribute('data-value');
+    if (initialSubtypes.includes(val)) {
+      btn.classList.add('active');
+    }
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      const selected = Array.from(subtypeButtons)
+        .filter(b => b.classList.contains('active'))
+        .map(b => b.getAttribute('data-value'));
+      subtypesInput.value = JSON.stringify(selected);
+    });
+  });
+  subtypesInput.value = JSON.stringify(initialSubtypes);
   
   document.getElementById('form-cancel-edit').addEventListener('click', () => {
     showEventDetailModalAdmin(event);
@@ -1219,6 +1355,9 @@ function showEditEventModal(event) {
     const title = document.getElementById('form-title').value.trim();
     const type = document.getElementById('form-type').value;
     const mode = document.getElementById('form-mode').value || null;
+    const location = document.getElementById('form-location').value || null;
+    const subtypesVal = document.getElementById('form-subtypes').value;
+    const subtypes = subtypesVal ? JSON.parse(subtypesVal) : [];
     const date = document.getElementById('form-date').value;
     const desc = document.getElementById('form-desc').value.trim();
     
@@ -1232,6 +1371,8 @@ function showEditEventModal(event) {
       title,
       type,
       mode,
+      location,
+      subtypes,
       date,
       desc
     };
@@ -1275,18 +1416,33 @@ function showCreateEventModal(dateStr) {
       <div class="form-group">
         <label for="form-type">Update Type</label>
         <select id="form-type" required>
-          <option value="academic" selected>Placement Drive</option>
-          <option value="exams">Interviews & Tests</option>
+          <option value="exams" selected>Interviews & Tests</option>
           <option value="holidays">Holidays & Breaks</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Drive Format (Optional)</label>
+        <label>Drive Format</label>
         <div class="format-buttons-group">
           <button type="button" class="format-btn" id="format-btn-online" data-value="online">Online</button>
           <button type="button" class="format-btn" id="format-btn-offline" data-value="offline">Offline</button>
         </div>
         <input type="hidden" id="form-mode" value="">
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <div class="location-buttons-group">
+          <button type="button" class="location-btn" id="location-btn-oncampus" data-value="oncampus">On-Campus</button>
+          <button type="button" class="location-btn" id="location-btn-offcampus" data-value="offcampus">Off-Campus</button>
+        </div>
+        <input type="hidden" id="form-location" value="">
+      </div>
+      <div class="form-group">
+        <label>Rounds</label>
+        <div class="subtypes-buttons-group">
+          <button type="button" class="subtype-btn" data-value="OA">OA</button>
+          <button type="button" class="subtype-btn" data-value="Technical">Technical</button>
+        </div>
+        <input type="hidden" id="form-subtypes" value="">
       </div>
       <div class="form-group">
         <label for="form-date">Scheduled Date</label>
@@ -1314,21 +1470,57 @@ function showCreateEventModal(dateStr) {
       btn.classList.remove('active');
       modeInput.value = '';
     } else {
-      onlineBtn.classList.remove('active');
-      offlineBtn.classList.remove('active');
+      [onlineBtn, offlineBtn].forEach(b => b?.classList.remove('active'));
       btn.classList.add('active');
       modeInput.value = value;
     }
   };
   
-  onlineBtn.addEventListener('click', () => handleFormatClick(onlineBtn, 'online'));
-  offlineBtn.addEventListener('click', () => handleFormatClick(offlineBtn, 'offline'));
+  if (onlineBtn) onlineBtn.addEventListener('click', () => handleFormatClick(onlineBtn, 'online'));
+  if (offlineBtn) offlineBtn.addEventListener('click', () => handleFormatClick(offlineBtn, 'offline'));
+  
+  // Location buttons logic
+  const locationInput = document.getElementById('form-location');
+  const oncampusBtn = document.getElementById('location-btn-oncampus');
+  const offcampusBtn = document.getElementById('location-btn-offcampus');
+  
+  const handleLocationClick = (btn, value) => {
+    if (btn.classList.contains('active')) {
+      btn.classList.remove('active');
+      locationInput.value = '';
+    } else {
+      [oncampusBtn, offcampusBtn].forEach(b => b?.classList.remove('active'));
+      btn.classList.add('active');
+      locationInput.value = value;
+    }
+  };
+  
+  if (oncampusBtn) oncampusBtn.addEventListener('click', () => handleLocationClick(oncampusBtn, 'oncampus'));
+  if (offcampusBtn) offcampusBtn.addEventListener('click', () => handleLocationClick(offcampusBtn, 'offcampus'));
+  
+  // Subtypes multi-select logic
+  const subtypesInput = document.getElementById('form-subtypes');
+  const subtypeButtons = card.querySelectorAll('.subtype-btn');
+  
+  subtypeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      const selected = Array.from(subtypeButtons)
+        .filter(b => b.classList.contains('active'))
+        .map(b => b.getAttribute('data-value'));
+      subtypesInput.value = JSON.stringify(selected);
+    });
+  });
+  subtypesInput.value = JSON.stringify([]);
   
   document.getElementById('create-event-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = document.getElementById('form-title').value.trim();
     const type = document.getElementById('form-type').value;
     const mode = document.getElementById('form-mode').value || null;
+    const location = document.getElementById('form-location').value || null;
+    const subtypesVal = document.getElementById('form-subtypes').value;
+    const subtypes = subtypesVal ? JSON.parse(subtypesVal) : [];
     const date = document.getElementById('form-date').value;
     const desc = document.getElementById('form-desc').value.trim();
     
@@ -1342,6 +1534,8 @@ function showCreateEventModal(dateStr) {
       title,
       type,
       mode,
+      location,
+      subtypes,
       date,
       desc
     };
@@ -1433,26 +1627,38 @@ function showLoginModal() {
     errorMsg.classList.remove('active');
     
     try {
-      const res = await fetch(`${API}/api/auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, password })
-      });
+      // Hash password using sha256 helper
+      const pwHash = await sha256(password);
       
-      const data = await res.json();
-      
-      if (res.ok && data.token) {
-        // Store JWT token securely in sessionStorage
-        sessionStorage.setItem('adminToken', data.token);
+      // Client-side authentication using SHA-256 (for "Placements%2019")
+      if (id === 'mdadmin' && pwHash === 'cd86e1bc9f8fcb8b62abfea747668a1fd7bd5fbb7acc40acf102d31675f7960f') {
+        // Store dummy token securely in sessionStorage
+        sessionStorage.setItem('adminToken', 'dummy-admin-jwt-token');
         isAdmin = true;
         hideEventModal();
         render();
       } else {
-        errorMsg.textContent = data.detail || 'Invalid Admin ID or Password.';
-        errorMsg.classList.add('active');
+        // Try fallback to server side auth just in case there's another setup
+        const res = await fetch(`${API}/api/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok && data.token) {
+          sessionStorage.setItem('adminToken', data.token);
+          isAdmin = true;
+          hideEventModal();
+          render();
+        } else {
+          errorMsg.textContent = data.detail || 'Invalid Admin ID or Password.';
+          errorMsg.classList.add('active');
+        }
       }
     } catch (err) {
-      errorMsg.textContent = 'Unable to connect to authentication server.';
+      errorMsg.textContent = 'Invalid Admin ID or Password or authentication server offline.';
       errorMsg.classList.add('active');
     } finally {
       submitBtn.disabled = false;
@@ -1848,8 +2054,12 @@ async function boot() {
         isAdmin = false;
       }
     } catch {
-      // Network error — don't block the app, just start as non-admin
-      isAdmin = false;
+      // Network/Server error — fallback client-side check for dummy token
+      if (token === 'dummy-admin-jwt-token') {
+        isAdmin = true;
+      } else {
+        isAdmin = false;
+      }
     }
   }
   render();

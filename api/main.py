@@ -9,8 +9,9 @@ API Docs: http://localhost:8000/docs
 import os
 import threading
 import uuid
+import json
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +23,7 @@ urllib3.disable_warnings()
 
 from src.batch_runner import generate_usns, run_batch_and_export
 from src.database import (
-    get_all_results, get_result_by_usn, get_results_count
+    get_all_results, get_result_by_usn, get_results_count, db
 )
 from src.exporter import export_to_excel
 from src.calculator import calculate_sgpa, calculate_cgpa, get_credits
@@ -368,3 +369,138 @@ def cleanup_files():
         "stale_jobs_cleared": len(stale_jobs),
         "message": f"Cleaned up {removed} files and {len(stale_jobs)} stale jobs."
     }
+
+
+# -- Admin Authentication and Calendar Events --
+
+class AuthRequest(BaseModel):
+    id: str
+    password: str
+
+class EventRequest(BaseModel):
+    id: int
+    title: str
+    type: str
+    mode: Optional[str] = None
+    location: Optional[str] = None
+    subtypes: Optional[list] = None
+    date: str
+    desc: str
+
+class DeleteEventRequest(BaseModel):
+    id: int
+
+# JSON File Paths for events
+EVENTS_JSON_PATH = os.path.join(BASE_DIR, "calendar_events.json")
+EVENTS_EXAMPLE_PATH = os.path.join(BASE_DIR, "calendar_events_example.json")
+
+def load_events_from_json():
+    # Fallback to example file if local calendar_events.json does not exist yet
+    path = EVENTS_JSON_PATH if os.path.exists(EVENTS_JSON_PATH) else EVENTS_EXAMPLE_PATH
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_events_to_json(events):
+    try:
+        with open(EVENTS_JSON_PATH, "w", encoding="utf-8") as f:
+            json.dump(events, f, indent=2)
+        return True
+    except Exception:
+        return False
+
+# Predefined/configured admin credentials
+ADMIN_ID = os.getenv("ADMIN_ID", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+DUMMY_TOKEN = "dummy-admin-jwt-token"
+
+def verify_token(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization Header")
+    try:
+        scheme, token = authorization.split(" ")
+        if scheme.lower() != "bearer" or token != DUMMY_TOKEN:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Authorization Header format")
+
+@app.post("/api/auth")
+def admin_auth(req: AuthRequest):
+    """Authenticate admin and return JWT-like token."""
+    if req.id == ADMIN_ID and req.password == ADMIN_PASSWORD:
+        return {"token": DUMMY_TOKEN}
+    raise HTTPException(status_code=400, detail="Invalid Admin ID or Password.")
+
+@app.get("/api/verify")
+def verify_admin_token(authorization: Optional[str] = Header(None)):
+    """Verify admin token validity."""
+    if not authorization:
+        return {"valid": False, "admin": False}
+    try:
+        scheme, token = authorization.split(" ")
+        if scheme.lower() == "bearer" and token == DUMMY_TOKEN:
+            return {"valid": True, "admin": True}
+    except Exception:
+        pass
+    return {"valid": False, "admin": False}
+
+@app.get("/api/events")
+def get_calendar_events():
+    """Retrieve all calendar events from JSON file."""
+    return load_events_from_json()
+
+@app.post("/api/events")
+def create_calendar_event(req: EventRequest, authorization: Optional[str] = Header(None)):
+    """Create a new calendar event in JSON file."""
+    verify_token(authorization)
+    events = load_events_from_json()
+    # Check if event already exists
+    if any(e.get("id") == req.id for e in events):
+        raise HTTPException(status_code=400, detail="Event already exists")
+    
+    event_data = req.dict()
+    events.append(event_data)
+    if not save_events_to_json(events):
+        raise HTTPException(status_code=500, detail="Failed to save event to file")
+    return event_data
+
+@app.put("/api/events")
+def update_calendar_event(req: EventRequest, authorization: Optional[str] = Header(None)):
+    """Update an existing calendar event in JSON file."""
+    verify_token(authorization)
+    events = load_events_from_json()
+    
+    found = False
+    event_data = req.dict()
+    for idx, e in enumerate(events):
+        if e.get("id") == req.id:
+            events[idx] = event_data
+            found = True
+            break
+            
+    if not found:
+        raise HTTPException(status_code=404, detail="Event not found")
+        
+    if not save_events_to_json(events):
+        raise HTTPException(status_code=500, detail="Failed to save updated events to file")
+    return event_data
+
+@app.delete("/api/events")
+def delete_calendar_event(req: DeleteEventRequest, authorization: Optional[str] = Header(None)):
+    """Delete a calendar event from JSON file."""
+    verify_token(authorization)
+    events = load_events_from_json()
+    
+    initial_len = len(events)
+    events = [e for e in events if e.get("id") != req.id]
+    
+    if len(events) == initial_len:
+        raise HTTPException(status_code=404, detail="Event not found")
+        
+    if not save_events_to_json(events):
+        raise HTTPException(status_code=500, detail="Failed to save events to file")
+    return {"status": "success", "message": "Event deleted"}
