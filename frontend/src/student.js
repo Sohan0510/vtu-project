@@ -1108,7 +1108,6 @@ function renderAgendaList() {
 }
 
 // 6. Dynamic Modal Overlays
-
 // Close modal helper
 function hideEventModal() {
   const modal = document.getElementById('event-modal');
@@ -1928,7 +1927,7 @@ function renderSPC(container) {
 
   wavingMan.className = 'waving-man-container';
   wavingMan.innerHTML = `
-    <div class="waving-man-bubble">We ❤️ you SPC!</div>
+    <div class="waving-man-bubble">We you SPC!</div>
     <svg viewBox="0 0 120 64" class="waving-man-svg">
       <!-- Left Stick Man -->
       <g class="stick-man-left">
