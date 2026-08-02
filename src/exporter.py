@@ -4,9 +4,10 @@ Excel Exporter
 Generates professionally formatted Excel reports from student results.
 
 Sheets:
-- "Summary" — One row per student with pass/fail, percentage, GPA
+- "Summary" — One row per student with pass/fail, percentage, GPA, backlogs
 - "Detailed Marks" — One row per subject per student, grouped by semester
 - Per-semester sheets — "Sem 1", "Sem 5", etc.
+- "Backlog History" — Origin/clearance tracking for all cleared backlogs
 - "Analytics" — Class statistics, toppers, subject-wise pass rates
 """
 
@@ -34,6 +35,8 @@ REVAL_FILL = PatternFill(start_color='FFEB9C', end_color='FFEB9C', fill_type='so
 TOPPER_FILL = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
 STATS_FILL = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
 ALT_ROW_FILL = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+BACKLOG_FILL = PatternFill(start_color='FCE4EC', end_color='FCE4EC', fill_type='solid')
+CLEARED_FILL = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
 
 THIN_BORDER = Border(
     left=Side(style='thin', color='B4B4B4'),
@@ -67,6 +70,44 @@ def _get_semester(subject_code):
     for ch in subject_code:
         if ch.isdigit():
             return int(ch)
+    return 0
+
+
+def get_semester_from_url(url, default_val="-"):
+    """
+    Returns the semester number (int) or exam label (str) from a VTU result URL.
+    """
+    if not url:
+        return default_val
+    u = str(url).lower()
+    if "djcbcs24" in u or "djrvcbcs24" in u:
+        return 1
+    if "jjecbcs24" in u or "jjrvcbcs24" in u:
+        return 2
+    if "makeupecbcs24" in u:
+        return "2 (Makeup '24)"
+    if "djcbcs25" in u or "djrvcbcs25" in u:
+        return 3
+    if "jjecbcs25" in u or "jjrvcbcs25" in u:
+        return 4
+    if "makeupecbcs25" in u:
+        return "4 (Makeup '25)"
+    if "secbcs25" in u or "servcbcs25" in u:
+        return "4 (Summer '25)"
+    if "d25j26" in u:
+        return 5
+    if "mj26" in u:
+        return 6
+    return default_val
+
+
+def _sem_to_int(val):
+    if isinstance(val, int):
+        return val
+    if isinstance(val, str):
+        for ch in str(val):
+            if ch.isdigit():
+                return int(ch)
     return 0
 
 
@@ -116,13 +157,13 @@ def export_to_excel(results, prefix="results"):
     usns = [r.get("usn", "") for r in sorted_results if r.get("usn")]
     usn_range = f"{usns[0]} to {usns[-1]}" if usns else "N/A"
     
-    ws_summary.merge_cells('A1:K1')
+    ws_summary.merge_cells('A1:P1')
     title_cell = ws_summary['A1']
     title_cell.value = "VTU EXAMINATION RESULTS"
     title_cell.font = TITLE_FONT
     title_cell.alignment = Alignment(horizontal='center', vertical='center')
     
-    ws_summary.merge_cells('A2:M2')
+    ws_summary.merge_cells('A2:P2')
     subtitle_cell = ws_summary['A2']
     subtitle_cell.value = f"USN Range: {usn_range}  |  Students: {len(results)}  |  Generated: {datetime.now().strftime('%d-%b-%Y %I:%M %p')}"
     subtitle_cell.font = SUBTITLE_FONT
@@ -131,7 +172,9 @@ def export_to_excel(results, prefix="results"):
     summary_headers = [
         "Sl.", "USN", "Student Name", "Semesters",
         "Subjects", "Passed", "Failed",
-        "Grand Total", "Percentage", "Latest SGPA", "CGPA", "Overall", "Reval Status"
+        "Grand Total", "Percentage", "Latest SGPA", "CGPA",
+        "Active Backlogs", "Historical Backlogs",
+        "Overall", "Reval Status"
     ]
     
     for col, header in enumerate(summary_headers, 1):
@@ -173,6 +216,11 @@ def export_to_excel(results, prefix="results"):
         has_reval = any(s.get("reval_updated") for s in subjects.values())
         reval_text = student.get("reval_status", "Applied" if has_reval else "-")
         
+        # Backlog fields
+        active_backlog_count = student.get("active_backlog_count", failed)
+        historical_backlogs = student.get("historical_backlogs", active_backlog_count > 0)
+        historical_text = "YES" if historical_backlogs else "NO"
+        
         if overall == "PASS":
             pass_count += 1
         else:
@@ -192,7 +240,9 @@ def export_to_excel(results, prefix="results"):
             topper_row = row_num
         
         row_data = [sl, usn, name, sems_str, total_subs, passed, failed,
-                     grand_total, percentage, sgpa, cgpa, overall, reval_text]
+                     grand_total, percentage, sgpa, cgpa,
+                     active_backlog_count, historical_text,
+                     overall, reval_text]
         
         for col, value in enumerate(row_data, 1):
             cell = ws_summary.cell(row=row_num, column=col, value=value)
@@ -203,14 +253,23 @@ def export_to_excel(results, prefix="results"):
                 cell.font = Font(name='Consolas', size=10, bold=True)
             elif col in (9, 10, 11):  # Percentage, SGPA, CGPA
                 cell.number_format = '0.00'
-            elif col == 12:  # Overall
+            elif col == 12:  # Active Backlogs
+                if isinstance(value, int) and value > 0:
+                    cell.fill = BACKLOG_FILL
+                    cell.font = Font(name='Calibri', bold=True, size=10, color='9C0006')
+                elif isinstance(value, int) and value == 0:
+                    cell.fill = CLEARED_FILL
+            elif col == 13:  # Historical Backlogs
+                if value == "YES":
+                    cell.fill = REVAL_FILL
+            elif col == 14:  # Overall
                 cell.fill = PASS_FILL if value == "PASS" else FAIL_FILL
                 cell.font = Font(name='Calibri', bold=True, size=10)
-            elif col == 13 and value and value != "-":  # Reval Status
+            elif col == 15 and value and value != "-":  # Reval Status
                 cell.fill = REVAL_FILL
             
             # Alternating row colors for readability
-            if sl % 2 == 0 and col not in (12, 13):
+            if sl % 2 == 0 and col not in (12, 13, 14, 15):
                 cell.fill = ALT_ROW_FILL
         
         row_num += 1
@@ -249,12 +308,12 @@ def export_to_excel(results, prefix="results"):
         value_cell.border = THIN_BORDER
         value_cell.alignment = DATA_ALIGNMENT
     
-    summary_widths = [6, 15, 28, 10, 10, 9, 9, 12, 10, 11, 11, 10, 12]
+    summary_widths = [6, 15, 28, 10, 10, 9, 9, 12, 10, 11, 11, 14, 16, 10, 12]
     for i, width in enumerate(summary_widths, 1):
         ws_summary.column_dimensions[get_column_letter(i)].width = width
     
     ws_summary.freeze_panes = 'A5'
-    ws_summary.auto_filter.ref = f"A4:M{row_num - 2}"
+    ws_summary.auto_filter.ref = f"A4:O{row_num - 2}"
     
     # ══════════════════════════════════════════
     # SHEET 2: DETAILED MARKS
@@ -458,6 +517,104 @@ def export_to_excel(results, prefix="results"):
         ws_sem.freeze_panes = 'A4'
         if row_num > 4:
             ws_sem.auto_filter.ref = f"A3:M{row_num - 1}"
+    
+    # ══════════════════════════════════════════
+    # BACKLOG HISTORY SHEET
+    # ══════════════════════════════════════════
+    ws_backlog = wb.create_sheet("Backlog History")
+    ws_backlog.sheet_properties.tabColor = "FF6B6B"
+    
+    ws_backlog.merge_cells('A1:I1')
+    title_cell = ws_backlog['A1']
+    title_cell.value = "BACKLOG ORIGIN & CLEARANCE TRACKING"
+    title_cell.font = TITLE_FONT
+    title_cell.alignment = Alignment(horizontal='center', vertical='center')
+    
+    ws_backlog.merge_cells('A2:I2')
+    subtitle_cell = ws_backlog['A2']
+    subtitle_cell.value = "Tracks every F→P transition: which semester a backlog originated and when/where it was cleared"
+    subtitle_cell.font = SUBTITLE_FONT
+    subtitle_cell.alignment = Alignment(horizontal='center', vertical='center')
+    
+    backlog_headers = [
+        "Sl.", "USN", "Student Name", "Subject Code", "Subject Name",
+        "Failed In Sem", "Cleared In Sem", "Duration (Sems)", "Status"
+    ]
+    for col, header in enumerate(backlog_headers, 1):
+        ws_backlog.cell(row=4, column=col, value=header)
+    _apply_header_style(ws_backlog, 4, len(backlog_headers))
+    
+    row_num = 5
+    sl_no = 1
+    
+    for student in sorted_results:
+        usn = student.get("usn", "")
+        name = student.get("name", "")
+        
+        # Add cleared backlogs
+        for entry in student.get("backlog_history", []):
+            cleared_url = entry.get("cleared_in_url", "")
+            cleared_sem = get_semester_from_url(cleared_url, default_val=entry.get("cleared_in_sem", "-"))
+            failed_sem = entry.get("failed_in_sem", "-")
+            
+            c_int = _sem_to_int(cleared_sem)
+            f_int = _sem_to_int(failed_sem)
+            if c_int and f_int and c_int >= f_int:
+                duration = max(1, c_int - f_int)
+            else:
+                duration = entry.get("duration_semesters", 1)
+                
+            row_data = [
+                sl_no, usn, name,
+                entry.get("code", ""),
+                entry.get("name", ""),
+                failed_sem,
+                cleared_sem,
+                duration,
+                "CLEARED"
+            ]
+            for col, value in enumerate(row_data, 1):
+                cell = ws_backlog.cell(row=row_num, column=col, value=value)
+                align = LEFT_ALIGNMENT if col in (3, 5) else DATA_ALIGNMENT
+                _apply_data_style(cell, align)
+                if col == 2:
+                    cell.font = Font(name='Consolas', size=10)
+                if col == 9:
+                    cell.fill = CLEARED_FILL
+                    cell.font = Font(name='Calibri', bold=True, size=10, color='006100')
+            sl_no += 1
+            row_num += 1
+        
+        # Add active backlogs
+        for entry in student.get("active_backlogs", []):
+            row_data = [
+                sl_no, usn, name,
+                entry.get("code", ""),
+                entry.get("name", ""),
+                entry.get("semester", "-"),
+                "-",
+                "-",
+                "ACTIVE"
+            ]
+            for col, value in enumerate(row_data, 1):
+                cell = ws_backlog.cell(row=row_num, column=col, value=value)
+                align = LEFT_ALIGNMENT if col in (3, 5) else DATA_ALIGNMENT
+                _apply_data_style(cell, align)
+                if col == 2:
+                    cell.font = Font(name='Consolas', size=10)
+                if col == 9:
+                    cell.fill = BACKLOG_FILL
+                    cell.font = Font(name='Calibri', bold=True, size=10, color='9C0006')
+            sl_no += 1
+            row_num += 1
+    
+    backlog_widths = [6, 15, 25, 14, 40, 14, 14, 14, 12]
+    for i, width in enumerate(backlog_widths, 1):
+        ws_backlog.column_dimensions[get_column_letter(i)].width = width
+    
+    ws_backlog.freeze_panes = 'A5'
+    if row_num > 5:
+        ws_backlog.auto_filter.ref = f"A4:I{row_num - 1}"
     
     # ══════════════════════════════════════════
     # ANALYTICS SHEET

@@ -9,12 +9,25 @@ Revaluation results use div-based tables with 9 columns.
 """
 
 import requests
+import random
+import time
+import base64
+from datetime import datetime
 from bs4 import BeautifulSoup
 import urllib3
 from urllib.parse import urljoin
 from src.captcha import solve_captcha
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# User-Agent pool to avoid rate-limiting on newer VTU portals
+_USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
+]
 
 
 def _get_result_url(base_url):
@@ -515,31 +528,52 @@ def _extract_semester(subject_code):
     return 0
 
 
-def fetch_student_result(usn, url, max_retries=15):
+def _create_session(url):
+    """Creates a fresh requests session with randomized User-Agent and connection pooling."""
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=1)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    session.headers.update({
+        'User-Agent': random.choice(_USER_AGENTS),
+        'Referer': url,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+    })
+    return session
+
+
+def fetch_student_result(usn, url, max_retries=35):
     """
     Fetches a single student's result from the VTU portal.
+    
+    Uses randomized delays between attempts and refreshes the session
+    every 5 failures to avoid CAPTCHA rate-limiting on newer portals.
     
     Returns:
         dict with keys: usn, name, subjects, grand_total, attempts
         OR dict with key: error
     """
-    session = requests.Session()
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Referer': url,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-    })
-
+    session = _create_session(url)
     result_url = _get_result_url(url)
+    consecutive_failures = 0
 
     for attempt in range(1, max_retries + 1):
         try:
+            # Refresh session every 5 consecutive failures to get fresh cookies
+            if consecutive_failures > 0 and consecutive_failures % 5 == 0:
+                session.close()
+                session = _create_session(url)
+                time.sleep(random.uniform(1.0, 2.0))  # Longer pause on session refresh
+
             response = session.get(url, timeout=15, verify=False)
             soup = BeautifulSoup(response.text, 'html.parser')
 
             captcha_img_tag = soup.find('img', alt="CAPTCHA code")
             if not captcha_img_tag:
+                consecutive_failures += 1
+                time.sleep(random.uniform(0.3, 0.8))
                 continue
                 
             captcha_src = captcha_img_tag.get('src', '')
@@ -549,21 +583,37 @@ def fetch_student_result(usn, url, max_retries=15):
             captcha_response = session.get(captcha_url, timeout=10, verify=False)
             
             if len(captcha_response.content) < 100:
+                consecutive_failures += 1
+                time.sleep(random.uniform(0.3, 0.6))
                 continue
             
             captcha_text = solve_captcha(captcha_response.content)
             
             if len(captcha_text) != 6:
+                consecutive_failures += 1
+                time.sleep(random.uniform(0.2, 0.5))
                 continue
 
             token_tag = soup.find('input', {'name': 'Token'})
             token = token_tag['value'] if token_tag else ''
+            
+            # Anti-bot: New VTU portals (like 5th/6th sem) require a js_token
+            # It's generated client-side: btoa('student_access_' + new Date().getFullYear())
+            js_token_val = ''
+            js_token_tag = soup.find('input', {'name': 'js_token'})
+            if js_token_tag:
+                current_year = datetime.now().year
+                raw_token = f"student_access_{current_year}"
+                js_token_val = base64.b64encode(raw_token.encode()).decode()
 
             payload = {
                 'lns': usn,
                 'captchacode': captcha_text,
                 'Token': token
             }
+            
+            if js_token_tag:
+                payload['js_token'] = js_token_val
 
             post_response = session.post(result_url, data=payload, verify=False, timeout=15)
             result_soup = BeautifulSoup(post_response.text, 'html.parser')
@@ -590,12 +640,15 @@ def fetch_student_result(usn, url, max_retries=15):
                     }
                 if ("University Seat Number is not available" in page_text
                     or "not available or Invalid" in page_text
-                    or "Invalid..!" in page_text):
+                    or "You have not applied for reval or reval results are awaited !!!" in page_text):
                     return {"error": f"USN {usn} not found -- not available or Invalid."}
+                consecutive_failures += 1
+                time.sleep(random.uniform(0.3, 0.8))
                 continue
 
             student_name, subjects, grand_total = parse_result_page(result_soup)
             is_reval_page = _is_reval_format(result_soup)
+            consecutive_failures = 0  # Reset on success
             
             return {
                 "usn": usn,
@@ -607,10 +660,13 @@ def fetch_student_result(usn, url, max_retries=15):
             }
 
         except requests.exceptions.Timeout:
-            pass
+            consecutive_failures += 1
+            time.sleep(random.uniform(0.5, 1.5))
         except requests.exceptions.ConnectionError:
-            pass
+            consecutive_failures += 1
+            time.sleep(random.uniform(1.0, 2.0))
         except Exception as e:
             print(f"   [!] Error for {usn} attempt {attempt}: {e}")
+            consecutive_failures += 1
 
     return {"error": f"Failed to bypass CAPTCHA after {max_retries} attempts for {usn}."}

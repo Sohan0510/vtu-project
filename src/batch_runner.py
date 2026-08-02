@@ -10,6 +10,8 @@ import io
 import os
 import time
 import glob
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from src.scraper import fetch_student_result
 from src.database import save_or_update_result, get_results_by_usn_range
@@ -147,30 +149,48 @@ def run_batch(url, usns, is_reval=False, delay=0.5, max_retries=15,
         print(f"\n  --- {round_label} ({len(pending_usns)} students) ---\n")
         
         failed_this_round = []
+        lock = threading.Lock()
         
-        for i, usn in enumerate(pending_usns, 1):
-            processed_count += 1
-            print(f"\n[{processed_count}/{total}] Processing {usn}... ({round_label})")
-            
-            status, detail = _process_single_usn(usn, url, is_reval, max_retries)
-            
-            if status == "success" or status == "updated":
-                results["success"].append(detail)
-            elif status == "not_found":
-                results["not_found"].append(usn)
-            elif status == "unchanged":
-                results["unchanged"].append(usn)
-            elif status == "failed":
-                failed_this_round.append(usn)
-            
-            if progress_callback:
-                progress_callback(
-                    min(processed_count, total),
-                    total, usn, status
-                )
-            
-            if i < len(pending_usns):
-                time.sleep(delay)
+        def _worker(usn_val):
+            return usn_val, _process_single_usn(usn_val, url, is_reval, max_retries)
+        
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            future_to_usn = {
+                executor.submit(_worker, usn): usn
+                for usn in pending_usns
+            }
+            for future in as_completed(future_to_usn):
+                usn_val = future_to_usn[future]
+                try:
+                    res_usn, (status, detail) = future.result()
+                except Exception as e:
+                    print(f"   [!] Exception for {usn_val}: {e}")
+                    status, detail = "failed", None
+                
+                with lock:
+                    processed_count += 1
+                    print(f"[{processed_count}/{total}] Processed {usn_val} -> {status} ({round_label})")
+                    
+                    if status == "success" or status == "updated":
+                        results["success"].append(detail)
+                    elif status == "not_found":
+                        results["not_found"].append(usn_val)
+                    elif status == "unchanged":
+                        results["unchanged"].append(usn_val)
+                    elif status == "failed":
+                        failed_this_round.append(usn_val)
+                    
+                    status_to_report = status
+                    if status == "failed" and round_num <= retry_rounds:
+                        status_to_report = "redoing"
+                    
+                    if progress_callback:
+                        progress_callback(
+                            min(processed_count, total),
+                            total, usn_val, status_to_report,
+                            detail=detail,
+                            round_label=round_label
+                        )
         
         if not failed_this_round:
             print(f"\n  --- No failures! Skipping remaining retries. ---")
@@ -248,3 +268,109 @@ def run_batch_and_export(url, usns, is_reval=False, delay=0.5, max_retries=15,
         print("\n[!] No results in database to export.")
     
     return summary, excel_path
+
+
+def run_queue_batch(queue_entries, usns, delay=0.5, max_retries=20,
+                    retry_rounds=3, progress_callback=None):
+    """
+    Processes a queue of URLs sequentially.
+    Each URL is fully completed (with retries) before moving to the next.
+    
+    CRITICAL: If a URL fails for a student, it retries IMMEDIATELY for that URL
+    (all retry rounds) before proceeding to the next URL. This ensures correct
+    chronological backlog detection.
+    """
+    queue_total = len(queue_entries)
+    overall_start = time.time()
+    
+    queue_results = []
+    overall_summary = {
+        "total_urls": queue_total,
+        "completed_urls": 0,
+        "total_success": 0,
+        "total_failed": 0,
+        "total_not_found": 0,
+        "total_unchanged": 0,
+        "url_results": [],
+    }
+    
+    print(f"\n{'='*60}")
+    print(f"  VTU MULTI-URL QUEUE SCRAPER")
+    print(f"  URLs in queue: {queue_total}")
+    print(f"  Students per URL: {len(usns)}")
+    print(f"  Started: {datetime.now().strftime('%I:%M:%S %p')}")
+    print(f"{'='*60}\n")
+    
+    for q_idx, entry in enumerate(queue_entries):
+        url = entry["url"]
+        label = entry.get("label", f"URL {q_idx + 1}")
+        is_reval = entry.get("is_reval", False)
+        
+        print(f"\n{'─'*60}")
+        print(f"  QUEUE [{q_idx + 1}/{queue_total}]: {label}")
+        print(f"  URL: {url}")
+        print(f"  Mode: {'REVALUATION' if is_reval else 'REGULAR'}")
+        print(f"{'─'*60}\n")
+        
+        # Wrap progress callback to include queue-level info
+        def make_queue_callback(qi, ql, q_url):
+            def cb(current, total, usn, status, detail=None, round_label=None):
+                if progress_callback:
+                    progress_callback(qi, queue_total, ql, q_url, current, total, usn, status, detail=detail, round_label=round_label)
+            return cb
+        
+        url_summary = run_batch(
+            url=url,
+            usns=usns,
+            is_reval=is_reval,
+            delay=delay,
+            max_retries=max_retries,
+            retry_rounds=retry_rounds,
+            progress_callback=make_queue_callback(q_idx, label, url)
+        )
+        
+        url_result = {
+            "index": q_idx,
+            "label": label,
+            "url": url,
+            "is_reval": is_reval,
+            "summary": url_summary,
+        }
+        queue_results.append(url_result)
+        
+        overall_summary["completed_urls"] += 1
+        overall_summary["total_success"] += url_summary.get("success_count", 0)
+        overall_summary["total_failed"] += url_summary.get("failed_count", 0)
+        overall_summary["total_not_found"] += url_summary.get("not_found_count", 0)
+        overall_summary["total_unchanged"] += url_summary.get("unchanged_count", 0)
+        overall_summary["url_results"].append(url_result)
+        
+        # Small delay between URLs
+        if q_idx < queue_total - 1:
+            print(f"\n  Pausing 3s before next URL...")
+            time.sleep(3)
+    
+    overall_elapsed = time.time() - overall_start
+    overall_summary["elapsed_seconds"] = overall_elapsed
+    
+    print(f"\n{'='*60}")
+    print(f"  QUEUE COMPLETE — ALL {queue_total} URLs PROCESSED")
+    print(f"{'='*60}")
+    print(f"  Total Success:   {overall_summary['total_success']}")
+    print(f"  Total Failed:    {overall_summary['total_failed']}")
+    print(f"  Total Not Found: {overall_summary['total_not_found']}")
+    print(f"  Total Unchanged: {overall_summary['total_unchanged']}")
+    print(f"  Total Time:      {overall_elapsed:.1f}s ({overall_elapsed/60:.1f} min)")
+    print(f"{'='*60}\n")
+    
+    # Export final results after all URLs processed
+    batch_results = get_results_by_usn_range(usns)
+    excel_path = None
+    if batch_results:
+        first_usn = usns[0]
+        last_usn = usns[-1]
+        range_prefix = f"QUEUE_{first_usn}_to_{last_usn}"
+        _cleanup_old_exports(range_prefix, keep_latest=1)
+        excel_path = export_to_excel(batch_results, prefix=range_prefix)
+    
+    return overall_summary, excel_path

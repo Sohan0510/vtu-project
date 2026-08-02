@@ -16,12 +16,12 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 import urllib3
 urllib3.disable_warnings()
 
-from src.batch_runner import generate_usns, run_batch_and_export
+from src.batch_runner import generate_usns, run_batch_and_export, run_queue_batch
 from src.database import (
     get_all_results, get_result_by_usn, get_results_count, db
 )
@@ -76,6 +76,30 @@ class ScrapeResponse(BaseModel):
     total_students: int
 
 
+class QueueEntry(BaseModel):
+    url: str
+    label: str
+    is_reval: bool = False
+
+
+class QueueScrapeRequest(BaseModel):
+    queue: List[QueueEntry]
+    college_code: str
+    year: str
+    branch: str
+    start_roll: int
+    end_roll: int
+    delay: float = 0.5
+    max_retries: int = 20
+
+
+class EligibilityRequest(BaseModel):
+    max_active_backlogs: int = 0
+    min_cgpa: float = 6.0
+    allow_historical_backlogs: bool = True
+    company_name: str = "Default"
+
+
 # -- Frontend Route --
 
 @app.get("/", response_class=HTMLResponse)
@@ -122,11 +146,24 @@ def start_scrape(req: ScrapeRequest):
         "usns": usns,  # Store for later export reference
     }
     
-    def progress_callback(current, total, usn, status):
+    def progress_callback(current, total, usn, status, detail=None, round_label=None):
         jobs[job_id]["progress"] = current
         jobs[job_id]["current_usn"] = usn
         jobs[job_id]["current_status"] = status
-        jobs[job_id]["results_log"].append({"usn": usn, "status": status})
+        
+        entry = {
+            "usn": usn,
+            "status": status,
+            "round_label": round_label or "INITIAL PASS",
+            "time": datetime.now().strftime("%I:%M:%S %p"),
+            "name": detail.get("name", "") if isinstance(detail, dict) else "",
+            "grand_total": detail.get("grand_total", "") if isinstance(detail, dict) else "",
+            "subjects_count": detail.get("subjects_count", "") if isinstance(detail, dict) else "",
+            "attempts": detail.get("attempts", "") if isinstance(detail, dict) else "",
+            "url_label": "Single URL",
+            "url": req.url
+        }
+        jobs[job_id]["results_log"].append(entry)
     
     def run_in_background():
         try:
@@ -155,6 +192,92 @@ def start_scrape(req: ScrapeRequest):
     )
 
 
+@app.post("/api/scrape-queue", response_model=ScrapeResponse)
+def start_queue_scrape(req: QueueScrapeRequest):
+    """Start a multi-URL chronological scraping job."""
+    
+    usns = generate_usns(req.college_code, req.year, req.branch, req.start_roll, req.end_roll)
+    
+    if not usns:
+        raise HTTPException(status_code=400, detail="Invalid roll range: no USNs generated.")
+    if not req.queue:
+        raise HTTPException(status_code=400, detail="Queue is empty. Provide at least one URL.")
+    
+    job_id = str(uuid.uuid4())[:8]
+    
+    jobs[job_id] = {
+        "status": "running",
+        "progress": 0,
+        "total": len(usns) * len(req.queue),
+        "current_usn": None,
+        "current_status": None,
+        "current_url_label": req.queue[0].label if req.queue else "",
+        "current_url_index": 1,
+        "total_urls": len(req.queue),
+        "started_at": datetime.now().isoformat(),
+        "summary": None,
+        "excel_path": None,
+        "results_log": [],
+        "usns": usns,
+    }
+    
+    def queue_progress_callback(q_idx, q_total, url_label, q_url, current, total, usn, status, detail=None, round_label=None):
+        overall_current = q_idx * total + current
+        overall_total = q_total * total
+        jobs[job_id]["progress"] = overall_current
+        jobs[job_id]["total"] = overall_total
+        jobs[job_id]["current_usn"] = usn
+        jobs[job_id]["current_status"] = status
+        jobs[job_id]["current_url_label"] = url_label
+        jobs[job_id]["current_url_index"] = q_idx + 1
+        jobs[job_id]["total_urls"] = q_total
+        
+        entry = {
+            "usn": usn,
+            "status": status,
+            "round_label": f"[{url_label}] {round_label or 'INITIAL PASS'}",
+            "time": datetime.now().strftime("%I:%M:%S %p"),
+            "name": detail.get("name", "") if isinstance(detail, dict) else "",
+            "grand_total": detail.get("grand_total", "") if isinstance(detail, dict) else "",
+            "subjects_count": detail.get("subjects_count", "") if isinstance(detail, dict) else "",
+            "attempts": detail.get("attempts", "") if isinstance(detail, dict) else "",
+            "url_label": url_label,
+            "url": q_url,
+            "queue_progress": f"{q_idx + 1}/{q_total}"
+        }
+        jobs[job_id]["results_log"].append(entry)
+    
+    def run_queue_in_background():
+        try:
+            queue_entries = [
+                {"url": q.url, "label": q.label, "is_reval": q.is_reval}
+                for q in req.queue
+            ]
+            summary, excel_path = run_queue_batch(
+                queue_entries=queue_entries,
+                usns=usns,
+                delay=req.delay,
+                max_retries=req.max_retries,
+                progress_callback=queue_progress_callback
+            )
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["summary"] = summary
+            jobs[job_id]["excel_path"] = excel_path
+        except Exception as e:
+            jobs[job_id]["status"] = "error"
+            jobs[job_id]["summary"] = {"error": str(e)}
+    
+    thread = threading.Thread(target=run_queue_in_background, daemon=True)
+    thread.start()
+    
+    return ScrapeResponse(
+        job_id=job_id,
+        message=f"Queue scraping started for {len(usns)} students across {len(req.queue)} URLs.",
+        total_students=len(usns)
+    )
+
+
+
 @app.get("/api/status/{job_id}")
 def get_status(job_id: str):
     """Check the progress of a scraping job."""
@@ -172,7 +295,7 @@ def get_status(job_id: str):
         "current_status": job.get("current_status"),
         "started_at": job.get("started_at"),
         "summary": job.get("summary"),
-        "results_log": job.get("results_log", [])[-15:]  # Last 15 entries
+        "results_log": job.get("results_log", [])[-100:]  # Last 100 entries
     }
 
 
@@ -328,6 +451,56 @@ def get_stats():
         "total_students": count,
         "active_jobs": sum(1 for j in jobs.values() if j["status"] == "running"),
         "completed_jobs": sum(1 for j in jobs.values() if j["status"] == "completed"),
+    }
+
+
+@app.get("/api/eligibility/presets")
+def get_eligibility_presets():
+    """Return common company eligibility presets."""
+    return {
+        "presets": [
+            {"name": "TCS Ninja / Infosys / Wipro", "min_cgpa": 6.0, "max_active_backlogs": 1, "allow_historical_backlogs": True},
+            {"name": "Accenture / Cognizant", "min_cgpa": 6.5, "max_active_backlogs": 0, "allow_historical_backlogs": True},
+            {"name": "Bosch / Mercedes / Core", "min_cgpa": 7.0, "max_active_backlogs": 0, "allow_historical_backlogs": False},
+            {"name": "Amazon / Microsoft / Tier-1", "min_cgpa": 7.5, "max_active_backlogs": 0, "allow_historical_backlogs": False},
+            {"name": "Open Dream Company", "min_cgpa": 6.0, "max_active_backlogs": 0, "allow_historical_backlogs": True},
+        ]
+    }
+
+
+@app.post("/api/eligibility/check")
+def check_eligibility(req: EligibilityRequest):
+    """Filter students by CGPA and backlog criteria."""
+    all_students = get_all_results()
+    eligible = []
+    
+    for s in all_students:
+        cgpa_val = calculate_cgpa(s.get("subjects", {}))
+        cgpa_num = cgpa_val if isinstance(cgpa_val, (int, float)) else 0.0
+        
+        active_backlogs = s.get("active_backlogs", 0)
+        has_history = s.get("has_backlog_history", False)
+        
+        if cgpa_num < req.min_cgpa:
+            continue
+        if active_backlogs > req.max_active_backlogs:
+            continue
+        if not req.allow_historical_backlogs and has_history:
+            continue
+        
+        eligible.append({
+            "usn": s.get("usn", ""),
+            "name": s.get("name", ""),
+            "cgpa": round(cgpa_num, 2),
+            "active_backlogs": active_backlogs,
+            "has_backlog_history": has_history
+        })
+    
+    return {
+        "company_name": req.company_name,
+        "eligible_count": len(eligible),
+        "total_checked": len(all_students),
+        "eligible_students": sorted(eligible, key=lambda x: x["cgpa"], reverse=True)
     }
 
 
