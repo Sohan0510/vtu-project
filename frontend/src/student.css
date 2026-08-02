@@ -577,6 +577,150 @@ h1, h2, h3, .mini-month-title {
   color: var(--text-muted);
 }
 
+/* Backlog Cards */
+.backlog-card {
+  background-color: var(--pass-bg);
+  border: 1px solid var(--pass-border);
+}
+.backlog-card .score-val {
+  color: var(--pass-text);
+}
+.backlog-card.has-backlogs {
+  background-color: var(--fail-bg);
+  border-color: var(--fail-border);
+}
+.backlog-card.has-backlogs .score-val {
+  color: var(--fail-text);
+}
+
+.history-card {
+  background-color: var(--pass-bg);
+  border: 1px solid var(--pass-border);
+}
+.history-card .score-val {
+  color: var(--pass-text);
+  font-size: 1.4rem;
+}
+.history-card.has-history {
+  background-color: #fef9e7;
+  border-color: #f0d78c;
+}
+.history-card.has-history .score-val {
+  color: #856404;
+}
+
+/* Backlog Detail Sections */
+#backlog-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.backlog-detail-section {
+  background: var(--cream-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-gold);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(42, 27, 17, 0.04);
+}
+
+.active-backlogs-section {
+  border-left: 4px solid var(--fail-text);
+}
+
+.history-backlogs-section {
+  border-left: 4px solid #c5a059;
+}
+
+.backlog-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--cream-dark);
+  border-bottom: 1px solid var(--border-gold);
+}
+
+.backlog-detail-icon {
+  font-size: 1rem;
+}
+
+.backlog-detail-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--wood-dark);
+}
+
+.backlog-detail-list {
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.backlog-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.active-backlog-item {
+  background: var(--fail-bg);
+  border: 1px solid var(--fail-border);
+}
+
+.cleared-backlog-item {
+  background: #fefdf5;
+  border: 1px solid #f0e4b8;
+}
+
+.backlog-subj-code {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--wood-dark);
+  font-size: 0.85rem;
+}
+
+.backlog-subj-name {
+  color: var(--text-muted);
+  font-weight: 500;
+  flex: 1;
+}
+
+.backlog-sem-badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.backlog-sem-badge:not(.fail-badge):not(.clear-badge) {
+  background: var(--fail-bg);
+  color: var(--fail-text);
+  border: 1px solid var(--fail-border);
+}
+
+.fail-badge {
+  background: var(--fail-bg);
+  color: var(--fail-text);
+  border: 1px solid var(--fail-border);
+}
+
+.clear-badge {
+  background: var(--pass-bg);
+  color: var(--pass-text);
+  border: 1px solid var(--pass-border);
+}
+
 /* Semester Nav Buttons */
 .semesters-nav {
   display: flex;

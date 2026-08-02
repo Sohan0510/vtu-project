@@ -1733,6 +1733,12 @@ function renderStudent(targetSem) {
     return;
   }
 
+  // Compute backlog info from API data
+  const activeBacklogCount = data.active_backlog_count || 0;
+  const hasHistoricalBacklogs = data.historical_backlogs || false;
+  const activeBacklogList = data.active_backlogs || [];
+  const backlogHistoryList = data.backlog_history || [];
+
   document.getElementById('profile-card').innerHTML = `
     <div class="profile-avatar">${initials}</div>
     <div class="profile-info">
@@ -1748,8 +1754,75 @@ function renderStudent(targetSem) {
         <div class="score-val">${data.cgpa || '-'}</div>
         <div class="score-lbl">Overall CGPA</div>
       </div>
+      <div class="score-card backlog-card ${activeBacklogCount > 0 ? 'has-backlogs' : ''}">
+        <div class="score-val">${activeBacklogCount}</div>
+        <div class="score-lbl">Active Backlogs</div>
+      </div>
+      <div class="score-card history-card ${hasHistoricalBacklogs ? 'has-history' : ''}">
+        <div class="score-val">${hasHistoricalBacklogs ? 'YES' : 'NO'}</div>
+        <div class="score-lbl">History of Backlogs</div>
+      </div>
     </div>
   `;
+
+  // Render backlog details section (shown below profile card, above semester tabs)
+  let backlogDetailsHtml = '';
+
+  if (activeBacklogCount > 0) {
+    backlogDetailsHtml += `
+      <div class="backlog-detail-section active-backlogs-section">
+        <div class="backlog-detail-header">
+          <span class="backlog-detail-icon">🔴</span>
+          <span class="backlog-detail-title">Active Backlogs (${activeBacklogCount})</span>
+        </div>
+        <div class="backlog-detail-list">
+          ${activeBacklogList.map(b => `
+            <div class="backlog-item active-backlog-item">
+              <span class="backlog-subj-code">${escapeHTML(b.code || b)}</span>
+              <span class="backlog-subj-name">${escapeHTML(b.name || '')}</span>
+              ${b.semester ? `<span class="backlog-sem-badge">Sem ${b.semester}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  if (backlogHistoryList.length > 0) {
+    backlogDetailsHtml += `
+      <div class="backlog-detail-section history-backlogs-section">
+        <div class="backlog-detail-header">
+          <span class="backlog-detail-icon">🟡</span>
+          <span class="backlog-detail-title">Backlog History (Cleared)</span>
+        </div>
+        <div class="backlog-detail-list">
+          ${backlogHistoryList.map(b => `
+            <div class="backlog-item cleared-backlog-item">
+              <span class="backlog-subj-code">${escapeHTML(b.code || b)}</span>
+              <span class="backlog-subj-name">${escapeHTML(b.name || '')}</span>
+              ${b.failed_sem ? `<span class="backlog-sem-badge fail-badge">Failed Sem ${b.failed_sem}</span>` : ''}
+              ${b.cleared_sem ? `<span class="backlog-sem-badge clear-badge">Cleared Sem ${b.cleared_sem}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Insert backlog details after profile card
+  const profileCard = document.getElementById('profile-card');
+  const existingBacklogContainer = document.getElementById('backlog-details');
+  if (backlogDetailsHtml) {
+    let backlogContainer = existingBacklogContainer;
+    if (!backlogContainer) {
+      backlogContainer = document.createElement('div');
+      backlogContainer.id = 'backlog-details';
+      profileCard.insertAdjacentElement('afterend', backlogContainer);
+    }
+    backlogContainer.innerHTML = backlogDetailsHtml;
+  } else if (existingBacklogContainer) {
+    existingBacklogContainer.remove();
+  }
 
   // Render Semesters Nav Tabs
   document.getElementById('semesters-nav').innerHTML = `
