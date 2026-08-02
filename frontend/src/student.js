@@ -1733,60 +1733,13 @@ function renderStudent(targetSem) {
     return;
   }
 
-  // Build Backlog Timeline HTML
-  let timelineHtml = '';
-  if (data.semesters && data.semesters.length > 0) {
-    const semStatuses = [];
-    data.semesters.forEach(sem => {
-      // Find subjects for this sem
-      const semSubs = Object.values(subjects).filter(s => (s.semester || getSemFromCode(s.code)) === sem);
-      const fails = semSubs.filter(s => s.status === 'F' || s.status === 'A').length;
-      
-      // Find backlogs cleared in this sem
-      const cleared = (data.backlog_history || []).filter(h => h.cleared_in_sem === sem).length;
-      
-      let statusHtml = '';
-      if (fails > 0) {
-        statusHtml = `<span class="timeline-status fail">⚠️ ${fails} active</span>`;
-      } else if (cleared > 0) {
-        statusHtml = `<span class="timeline-status cleared">✅ cleared ${cleared}</span>`;
-      } else {
-        statusHtml = `<span class="timeline-status pass">✅ clean</span>`;
-      }
-      
-      semStatuses.push(`<div class="timeline-item"><div class="timeline-sem">Sem ${sem}</div>${statusHtml}</div>`);
-    });
-    
-    timelineHtml = `
-      <div class="backlog-timeline">
-        <h4 class="timeline-header">Academic Journey</h4>
-        <div class="timeline-track">
-          ${semStatuses.join('<div class="timeline-arrow">→</div>')}
-        </div>
-      </div>
-    `;
-  }
-  
-  // Historical backlogs text
-  const histText = data.historical_backlogs 
-    ? (data.active_backlog_count > 0 ? '<span class="status-f">Has Active Backlogs</span>' : '<span class="status-p">All Backlogs Cleared</span>')
-    : '<span class="status-p">No History of Backlogs</span>';
-
   document.getElementById('profile-card').innerHTML = `
     <div class="profile-avatar">${initials}</div>
     <div class="profile-info">
       <div class="profile-name">${data.name || 'Unknown'}</div>
       <div class="profile-usn">${data.usn} &bull; ${sortedSems.length} Semester${sortedSems.length > 1 ? 's' : ''} Record</div>
-      <div class="profile-backlog-status" style="font-size: 0.85rem; margin-top: 4px; color: #666;">
-        History: ${histText}
-      </div>
     </div>
     <div class="score-cards">
-      ${data.active_backlog_count > 0 ? `
-      <div class="score-card fail-card" style="background: var(--surface-danger-light); border-color: var(--danger-color);">
-        <div class="score-val" style="color: var(--danger-color);">${data.active_backlog_count}</div>
-        <div class="score-lbl" style="color: var(--danger-color);">Active Backlogs</div>
-      </div>` : ''}
       <div class="score-card sgpa-card">
         <div class="score-val">${data.sgpa || '-'}</div>
         <div class="score-lbl">Latest SGPA</div>
@@ -1796,7 +1749,6 @@ function renderStudent(targetSem) {
         <div class="score-lbl">Overall CGPA</div>
       </div>
     </div>
-    ${timelineHtml}
   `;
 
   // Render Semesters Nav Tabs

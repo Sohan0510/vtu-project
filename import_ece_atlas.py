@@ -70,7 +70,7 @@ Pughal p\t1RF24EC403\t7
 Varun Achar\t1RF24EC404\t6.73
 Veeresha M\t1RF24EC405\t6.13"""
 
-MONGO_URI = "mongodb+srv://5223346sohansridattaa_db_user:eCFXJ0aq7RiD6IHk@cluster0.ccgnozo.mongodb.net/?appName=Cluster0"
+MONGO_URI = "mongodb+srv://rvit23bcs098rvitm_db_user:Yf0Adfamr3epAVEY@cluster0.vknq65z.mongodb.net/?appName=Cluster0"
 
 students_docs = []
 lines = [line.strip() for line in ROSTER_DATA.strip().split('\n') if line.strip()]
@@ -106,7 +106,26 @@ collection.create_index('usn', unique=True)
 
 inserted = updated = 0
 for doc in students_docs:
-    res = collection.update_one({'usn': doc['usn']}, {'$set': doc}, upsert=True)
+    set_fields = {
+        'usn': doc['usn'],
+        'name': doc['name'],
+        'cgpa': doc['cgpa'],
+        'sgpa': doc['sgpa'],
+    }
+    if doc['cgpa'] is not None:
+        set_fields['sgpa_map.1'] = doc['cgpa']
+    
+    update_op = {
+        '$set': set_fields,
+        '$setOnInsert': {
+            'subjects': {},
+            'semesters': [1] if doc['cgpa'] is not None else []
+        }
+    }
+    if doc['cgpa'] is not None:
+        update_op['$addToSet'] = {'semesters': 1}
+        
+    res = collection.update_one({'usn': doc['usn']}, update_op, upsert=True)
     if res.matched_count > 0:
         updated += 1
     else:
