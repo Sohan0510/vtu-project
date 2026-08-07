@@ -53,6 +53,22 @@
   --cat-offcampus-bg: #f0fdfa;
   --cat-offcampus-txt: #115e59;
   --cat-offcampus-border: #99f6e4;
+
+  --cat-worksite-bg: #fef3c7;
+  --cat-worksite-txt: #92400e;
+  --cat-worksite-border: #fde68a;
+
+  --cat-studenttype-be-bg: #e0f2fe;
+  --cat-studenttype-be-txt: #075985;
+  --cat-studenttype-be-border: #bae6fd;
+
+  --cat-studenttype-mca-bg: #fce7f3;
+  --cat-studenttype-mca-txt: #9d174d;
+  --cat-studenttype-mca-border: #fbcfe8;
+
+  --cat-studenttype-bemca-bg: #ecfdf5;
+  --cat-studenttype-bemca-txt: #065f46;
+  --cat-studenttype-bemca-border: #a7f3d0;
   
   --cat-oa-bg: #eef2ff;
   --cat-oa-txt: #3730a3;
@@ -1006,6 +1022,7 @@ tr:hover td {
 .checkbox-offline { background-color: var(--cat-offline-bg); border-color: var(--cat-offline-border); }
 .checkbox-oncampus { background-color: var(--cat-oncampus-bg); border-color: var(--cat-oncampus-border); }
 .checkbox-offcampus { background-color: var(--cat-offcampus-bg); border-color: var(--cat-offcampus-border); }
+.checkbox-worksite { background-color: var(--cat-worksite-bg); border-color: var(--cat-worksite-border); }
 
 .filter-item input:checked + .checkbox-custom::after {
   content: '';
@@ -1023,6 +1040,7 @@ tr:hover td {
 #filter-offline:checked + .checkbox-custom::after { background-color: var(--cat-offline-txt); }
 #filter-oncampus:checked + .checkbox-custom::after { background-color: var(--cat-oncampus-txt); }
 #filter-offcampus:checked + .checkbox-custom::after { background-color: var(--cat-offcampus-txt); }
+#filter-worksite:checked + .checkbox-custom::after { background-color: var(--cat-worksite-txt); }
 
 
 /* Main Calendar Desk styling */
@@ -1232,6 +1250,25 @@ tr:hover td {
 .calendar-event-pill:hover {
   transform: scale(1.02);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.calendar-event-more {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gold-dark);
+  padding: 2px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  letter-spacing: 0.02em;
+  transition: color 0.15s ease;
+}
+
+.calendar-event-more:hover {
+  color: var(--wood-medium);
+  text-decoration: underline;
 }
 
 .event-dot {
@@ -1639,6 +1676,68 @@ tr:hover td {
   border-color: var(--cat-offcampus-border);
 }
 
+.location-btn.active[data-value="worksite"] {
+  background-color: var(--cat-worksite-bg);
+  color: var(--cat-worksite-txt);
+  border-color: var(--cat-worksite-border);
+}
+
+/* Student Type button group — same layout as Rounds/Subtypes */
+.studenttype-buttons-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.studenttype-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-sm);
+  background: var(--bg-parchment);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  min-width: 64px;
+}
+
+.studenttype-btn:hover {
+  border-color: var(--gold-medium);
+  color: var(--wood-dark);
+}
+
+.studenttype-btn.active[data-value="BE"] {
+  background-color: var(--cat-studenttype-be-bg);
+  color: var(--cat-studenttype-be-txt);
+  border-color: var(--cat-studenttype-be-border);
+}
+
+.studenttype-btn.active[data-value="MCA"] {
+  background-color: var(--cat-studenttype-mca-bg);
+  color: var(--cat-studenttype-mca-txt);
+  border-color: var(--cat-studenttype-mca-border);
+}
+
+.studenttype-btn.active[data-value="BE | MCA"] {
+  background-color: var(--cat-studenttype-bemca-bg);
+  color: var(--cat-studenttype-bemca-txt);
+  border-color: var(--cat-studenttype-bemca-border);
+}
+
+/* Optional label helper */
+.form-label-optional {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted, #9ca3af);
+  margin-left: 4px;
+  font-style: italic;
+}
+
 /* Subtypes selection styling */
 .subtypes-buttons-group {
   display: flex;
@@ -1711,6 +1810,30 @@ tr:hover td {
   border: 1px solid var(--cat-offcampus-border);
 }
 
+.pill-mode-tag.mode-worksite {
+  background-color: var(--cat-worksite-bg);
+  color: var(--cat-worksite-txt);
+  border: 1px solid var(--cat-worksite-border);
+}
+
+.pill-mode-tag.mode-studenttype-be {
+  background-color: var(--cat-studenttype-be-bg);
+  color: var(--cat-studenttype-be-txt);
+  border: 1px solid var(--cat-studenttype-be-border);
+}
+
+.pill-mode-tag.mode-studenttype-mca {
+  background-color: var(--cat-studenttype-mca-bg);
+  color: var(--cat-studenttype-mca-txt);
+  border: 1px solid var(--cat-studenttype-mca-border);
+}
+
+.pill-mode-tag.mode-studenttype-be-mca {
+  background-color: var(--cat-studenttype-bemca-bg);
+  color: var(--cat-studenttype-bemca-txt);
+  border: 1px solid var(--cat-studenttype-bemca-border);
+}
+
 /* Modal header Mode Badge */
 .modal-mode-badge {
   font-size: 0.7rem;
@@ -1743,6 +1866,30 @@ tr:hover td {
   background-color: var(--cat-offcampus-bg);
   color: var(--cat-offcampus-txt);
   border: 1px solid var(--cat-offcampus-border);
+}
+
+.modal-mode-badge.mode-worksite {
+  background-color: var(--cat-worksite-bg);
+  color: var(--cat-worksite-txt);
+  border: 1px solid var(--cat-worksite-border);
+}
+
+.modal-mode-badge.mode-studenttype-be {
+  background-color: var(--cat-studenttype-be-bg);
+  color: var(--cat-studenttype-be-txt);
+  border: 1px solid var(--cat-studenttype-be-border);
+}
+
+.modal-mode-badge.mode-studenttype-mca {
+  background-color: var(--cat-studenttype-mca-bg);
+  color: var(--cat-studenttype-mca-txt);
+  border: 1px solid var(--cat-studenttype-mca-border);
+}
+
+.modal-mode-badge.mode-studenttype-be-mca {
+  background-color: var(--cat-studenttype-bemca-bg);
+  color: var(--cat-studenttype-bemca-txt);
+  border: 1px solid var(--cat-studenttype-bemca-border);
 }
 
 /* Modal header Subtype Badge */
@@ -2042,6 +2189,30 @@ tr:hover td {
   border: 1px solid var(--cat-offcampus-border);
 }
 
+.agenda-mode-tag.mode-worksite {
+  background-color: var(--cat-worksite-bg);
+  color: var(--cat-worksite-txt);
+  border: 1px solid var(--cat-worksite-border);
+}
+
+.agenda-mode-tag.mode-studenttype-be {
+  background-color: var(--cat-studenttype-be-bg);
+  color: var(--cat-studenttype-be-txt);
+  border: 1px solid var(--cat-studenttype-be-border);
+}
+
+.agenda-mode-tag.mode-studenttype-mca {
+  background-color: var(--cat-studenttype-mca-bg);
+  color: var(--cat-studenttype-mca-txt);
+  border: 1px solid var(--cat-studenttype-mca-border);
+}
+
+.agenda-mode-tag.mode-studenttype-be-mca {
+  background-color: var(--cat-studenttype-bemca-bg);
+  color: var(--cat-studenttype-bemca-txt);
+  border: 1px solid var(--cat-studenttype-bemca-border);
+}
+
 /* Agenda Subtype tags */
 .agenda-subtype-tag {
   font-size: 0.65rem;
@@ -2276,61 +2447,87 @@ tr:hover td {
     -webkit-mask-image: linear-gradient(to right, #000 0%, #000 92%, transparent 100%);
   }
 
-  /* Make main calendar day grid compact and set width to show a partial column hint (~4.6 columns visible) */
-  .calendar-grid-header,
+  /* Use auto row height so cells can expand to fit events + +N more badge */
   .calendar-grid-body {
     width: 150% !important;
     min-width: unset !important;
-  }
-  .calendar-grid-body {
-    grid-auto-rows: 55px !important;
+    grid-auto-rows: auto !important;
     gap: 1px !important;
+  }
+  /* Keep header width in sync with the scrollable grid body */
+  .calendar-grid-header {
+    width: 150% !important;
+    min-width: unset !important;
   }
   .calendar-grid-header div,
   .calendar-day-cell {
     scroll-snap-align: start;
   }
 
-  /* Align calendar cells and day numbers to top-left (just like desktop view) */
+  /* --- Mobile day cell: auto height, snug padding --- */
   .calendar-day-cell {
-    padding: 6px 4px !important;
+    padding: 5px 3px 4px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
     align-items: flex-start !important;
-    min-height: 55px !important;
+    min-height: 64px !important;   /* enough room for 1 pill + badge */
+    height: auto !important;       /* grow if more pills shown */
+    overflow: visible !important;  /* never clip content */
     cursor: pointer;
+    box-sizing: border-box !important;
   }
 
   .day-number {
-    font-size: 0.82rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
     align-self: flex-start !important;
-    margin-top: 0 !important;
-    margin-left: 2px !important;
+    margin: 0 0 3px 1px !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
   }
 
-  /* Show textual event representation on grid cell with clean ellipsis */
+  /* --- day-events wrapper: never clip --- */
+  .calendar-day-cell .day-events {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    width: 100% !important;
+    overflow: visible !important;   /* CRITICAL: never clip the badge */
+    flex-shrink: 0 !important;
+  }
+
+  /* --- Event pill: readable, consistent, color-bar style --- */
   .calendar-day-cell .calendar-event-pill {
-    width: calc(100% - 4px) !important;
-    height: 15px !important;
+    width: 100% !important;
+    height: 16px !important;        /* fixed readable height */
     border-radius: 3px !important;
-    padding: 1px 4px !important;
-    margin: 2px auto 0 auto !important;
+    padding: 0 5px !important;
+    margin: 0 !important;
     display: flex !important;
     align-items: center !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
-    border: 1px solid rgba(0, 0, 0, 0.05) !important;
     box-shadow: none !important;
     transform: none !important;
     overflow: hidden !important;
+    gap: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .calendar-day-cell .calendar-event-pill .event-dot {
+    display: none !important;       /* hide dot; full background is the color indicator */
+  }
+
+  .calendar-day-cell .calendar-event-pill .pill-mode-tag {
+    display: none !important;
   }
 
   .calendar-day-cell .calendar-event-pill .event-text {
     display: block !important;
-    font-size: 8px !important;
+    font-size: 10px !important;     /* minimum readable size — never go below this */
     font-weight: 700 !important;
-    line-height: 1 !important;
+    line-height: 16px !important;   /* match pill height for vertical centering */
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -2338,28 +2535,20 @@ tr:hover td {
     text-align: left !important;
   }
 
-  .calendar-day-cell .calendar-event-pill .event-dot {
-    display: none !important;
-  }
-
-  .calendar-day-cell .calendar-event-pill .pill-mode-tag {
-    display: none !important;
-  }
-
-  /* Stack events vertically on mobile instead of inline row */
-  .calendar-day-cell .day-events {
-    display: flex !important;
-    flex-direction: column !important;
-    flex-wrap: nowrap !important;
-    justify-content: flex-start !important;
-    align-items: stretch !important;
-    gap: 2px !important;
-    width: 100% !important;
-    height: auto !important;
+  /* --- +N more badge: always visible, clearly styled --- */
+  .calendar-day-cell .calendar-event-more {
+    display: block !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    color: var(--gold-dark) !important;
+    padding: 1px 2px !important;
     margin-top: 2px !important;
-    margin-left: 0 !important;
-    margin-bottom: 0 !important;
-    overflow: hidden !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    overflow: visible !important;   /* never clip the badge */
+    letter-spacing: 0.02em !important;
+    flex-shrink: 0 !important;
   }
 
   /* Map event background and text colors to mobile pills */
@@ -2468,6 +2657,36 @@ tr:hover td {
     box-sizing: border-box !important;
     border-radius: var(--radius-lg) !important;
     justify-content: center !important;
+  }
+}
+
+/* ── Very small screens (<480px): 1 event max, tighter cells ── */
+@media (max-width: 479px) {
+  /* Bump up the minimum height to ensure date + 1 pill + badge all fit */
+  .calendar-day-cell {
+    min-height: 68px !important;
+    padding: 4px 2px 4px !important;
+  }
+
+  .day-number {
+    font-size: 0.72rem !important;
+    margin-bottom: 2px !important;
+  }
+
+  /* Single event pill stays full-width and readable */
+  .calendar-day-cell .calendar-event-pill {
+    height: 15px !important;
+  }
+
+  .calendar-day-cell .calendar-event-pill .event-text {
+    font-size: 9px !important;
+    line-height: 15px !important;
+  }
+
+  /* Badge stays clearly visible */
+  .calendar-day-cell .calendar-event-more {
+    font-size: 8px !important;
+    margin-top: 2px !important;
   }
 }
 

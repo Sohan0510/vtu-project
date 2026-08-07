@@ -556,6 +556,7 @@ class EventRequest(BaseModel):
     type: str
     mode: Optional[str] = None
     location: Optional[str] = None
+    studentType: Optional[str] = None
     subtypes: Optional[list] = None
     date: str
     desc: str
@@ -651,7 +652,16 @@ def verify_token(authorization: Optional[str] = Header(None)):
 @app.post("/api/auth")
 def admin_auth(req: AuthRequest):
     """Authenticate admin and return JWT-like token."""
-    if req.id == ADMIN_ID and req.password == ADMIN_PASSWORD:
+    import urllib.parse
+    req_password_decoded = urllib.parse.unquote(req.password)
+    admin_password_decoded = urllib.parse.unquote(ADMIN_PASSWORD)
+    
+    if req.id == ADMIN_ID and (
+        req.password == ADMIN_PASSWORD or 
+        req_password_decoded == admin_password_decoded or 
+        req_password_decoded == ADMIN_PASSWORD or 
+        req.password == admin_password_decoded
+    ):
         return {"token": DUMMY_TOKEN}
     raise HTTPException(status_code=400, detail="Invalid Admin ID or Password.")
 

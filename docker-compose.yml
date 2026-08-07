@@ -20,6 +20,8 @@ services:
     environment:
       - MONGO_URI=${MONGO_URI}
       - TESSERACT_PATH=/usr/bin/tesseract
+      - ADMIN_ID=${ADMIN_ID:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
     depends_on:
       - mongodb
     restart: unless-stopped
