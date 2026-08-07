@@ -677,18 +677,20 @@ function renderCalendar(container) {
             </div>
           </div>
 
-          <div class="calendar-grid-header">
-            <div>Sun</div>
-            <div>Mon</div>
-            <div>Tue</div>
-            <div>Wed</div>
-            <div>Thu</div>
-            <div>Fri</div>
-            <div>Sat</div>
-          </div>
+          <div class="calendar-grid-scroll-wrapper">
+            <div class="calendar-grid-header">
+              <div>Sun</div>
+              <div>Mon</div>
+              <div>Tue</div>
+              <div>Wed</div>
+              <div>Thu</div>
+              <div>Fri</div>
+              <div>Sat</div>
+            </div>
 
-          <div class="calendar-grid-body" id="calendar-days-grid">
-            <!-- Grid days rendered dynamically -->
+            <div class="calendar-grid-body" id="calendar-days-grid">
+              <!-- Grid days rendered dynamically -->
+            </div>
           </div>
           <!-- Agenda View for Selected Day (optimized for Mobile UX) -->
           <div class="calendar-agenda" id="calendar-agenda-view">
