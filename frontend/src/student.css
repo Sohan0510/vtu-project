@@ -2174,9 +2174,23 @@ tr:hover td {
   }
   .score-cards {
     width: 100%;
+    display: flex;
+    flex-wrap: wrap;
     justify-content: center;
+    gap: 12px;
     border-top: 1px solid var(--border-gold);
     padding-top: 20px;
+  }
+  .score-card {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 110px;
+    max-width: calc(50% - 6px);
+    padding: 12px 8px;
+    box-sizing: border-box;
+  }
+  .score-card:only-child {
+    max-width: 100%;
+    flex-basis: 100%;
   }
   .marks-header {
     flex-direction: column;
