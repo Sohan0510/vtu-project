@@ -11,6 +11,7 @@ let activeSem = 'all';
 let isAdmin = false;
 let currentCalendarDate = new Date();
 let selectedCalendarDate = new Date();
+let calendarInitialLoad = true;
 
 // Calendar Filter States (Online, Offline, On-Campus & Off-Campus drives)
 const calendarFilters = {
@@ -232,6 +233,7 @@ function renderHome(container) {
 
   document.getElementById('btn-calendar').addEventListener('click', () => {
     currentView = 'calendar';
+    calendarInitialLoad = true;
     render();
   });
 
@@ -725,6 +727,7 @@ function renderCalendar(container) {
   });
   document.getElementById('cal-today-btn')?.addEventListener('click', () => {
     currentCalendarDate = new Date();
+    calendarInitialLoad = true;
     generateMiniCalendar();
     generateCalendarGrid();
   });
@@ -953,6 +956,22 @@ function generateCalendarGrid() {
 
   // Render agenda list for the selected date
   renderAgendaList();
+
+  // Auto-scroll to the current week when first loaded or to the first day when month changes
+  if (calendarInitialLoad) {
+    const todayCell = gridContainer.querySelector('.today');
+    const scrollWrapper = gridContainer.closest('.calendar-grid-scroll-wrapper');
+    if (scrollWrapper && window.innerWidth <= 768) {
+      setTimeout(() => {
+        if (todayCell) {
+          todayCell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        } else {
+          scrollWrapper.scrollTo({ left: 0, behavior: 'smooth' });
+        }
+      }, 150);
+    }
+    calendarInitialLoad = false;
+  }
 }
 
 // 5.5. Render Agenda List for Selected Day

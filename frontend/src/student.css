@@ -2269,14 +2269,26 @@ tr:hover td {
     display: none !important;
   }
 
-  /* Make main calendar day grid compact */
+  .calendar-grid-scroll-wrapper {
+    scroll-snap-type: x mandatory;
+    /* subtle edge fade to indicate swipeability on mobile */
+    mask-image: linear-gradient(to right, #000 0%, #000 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 0%, #000 92%, transparent 100%);
+  }
+
+  /* Make main calendar day grid compact and set width to show a partial column hint (~4.6 columns visible) */
   .calendar-grid-header,
   .calendar-grid-body {
-    min-width: 650px !important;
+    width: 150% !important;
+    min-width: unset !important;
   }
   .calendar-grid-body {
     grid-auto-rows: 55px !important;
     gap: 1px !important;
+  }
+  .calendar-grid-header div,
+  .calendar-day-cell {
+    scroll-snap-align: start;
   }
 
   /* Align calendar cells and day numbers to top-left (just like desktop view) */
