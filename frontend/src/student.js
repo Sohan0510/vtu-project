@@ -1029,12 +1029,19 @@ function renderAgendaList() {
     <div class="agenda-header">
       <div class="agenda-title">Schedule for ${formattedDateStr}</div>
       ${isAdmin ? `
-        <button class="agenda-add-btn" id="agenda-add-event-btn">
-          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg> Add Update
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="agenda-add-btn" id="agenda-add-event-btn">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg> Add Update
+          </button>
+          <button class="agenda-add-btn" id="agenda-ai-post-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; border: none; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.25);">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px;">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg> AI Quick Post
+          </button>
+        </div>
       ` : ''}
     </div>
     <div class="agenda-items">
@@ -1152,6 +1159,9 @@ function renderAgendaList() {
   if (isAdmin) {
     document.getElementById('agenda-add-event-btn')?.addEventListener('click', () => {
       showCreateEventModal(dateStr);
+    });
+    document.getElementById('agenda-ai-post-btn')?.addEventListener('click', () => {
+      showAIPostModal();
     });
   }
 }
@@ -1705,6 +1715,358 @@ function showCreateEventModal(dateStr) {
   });
 }
 
+// AI Quick Post Modal and Preview Layout
+function showAIPostModal() {
+  const modal = document.getElementById('event-modal');
+  const card = document.getElementById('modal-card-content');
+  if (!modal || !card) return;
+
+  card.innerHTML = `
+    <div class="modal-header">
+      <h3 style="font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.6rem; font-weight: 700; color: var(--wood-dark); display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.4rem;">✨</span> AI Quick Post Placement Update
+      </h3>
+      <button class="modal-close" onclick="hideEventModal()">&times;</button>
+    </div>
+    <div style="padding: 20px;">
+      <p style="margin: 0 0 15px 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.4;">
+        Paste the raw company notification, email criteria, or WhatsApp update text below. The AI will automatically parse the company name, dates, rounds, compensation, and eligibility criteria to generate the calendar events.
+      </p>
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label for="ai-raw-text" style="font-weight: 600; margin-bottom: 6px; display: block; font-size: 0.85rem; color: var(--text-secondary);">Raw Placement Text / Notification</label>
+        <textarea id="ai-raw-text" rows="8" style="width: 100%; padding: 12px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-family: 'Inter', sans-serif; font-size: 0.88rem; line-height: 1.5; resize: vertical;" placeholder="e.g. Google visiting. OA on 2026-08-10. Technical rounds on 2026-08-12. CTC: 35 LPA. Eligible branches: CSE, ISE. CGPA >= 7.5. No active backlogs."></textarea>
+      </div>
+      <div id="ai-post-error" class="login-error-msg" style="margin-bottom: 15px;"></div>
+      <div class="form-submit-group" style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button type="button" class="form-cancel-btn" onclick="hideEventModal()">Cancel</button>
+        <button type="button" id="ai-parse-submit-btn" class="form-submit-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; border: none;">
+          Analyze & Parse with AI
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.classList.add('active');
+
+  document.getElementById('ai-parse-submit-btn').addEventListener('click', async () => {
+    const rawText = document.getElementById('ai-raw-text').value.trim();
+    const errorMsg = document.getElementById('ai-post-error');
+    const submitBtn = document.getElementById('ai-parse-submit-btn');
+
+    if (!rawText) {
+      errorMsg.textContent = 'Please paste the raw placement text to parse.';
+      errorMsg.classList.add('active');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <svg class="spinner" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" style="animation: spin 1s linear infinite; margin-right: 6px; display: inline-block;">
+        <circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-dashoffset="10"/>
+      </svg>
+      Analyzing with AI...
+    `;
+    errorMsg.classList.remove('active');
+
+    try {
+      const token = sessionStorage.getItem('adminToken');
+      const response = await fetch(`${API}/api/ai/parse`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: rawText })
+      });
+      
+      if (!response.ok) throw new Error('AI parser service returned an error status');
+      
+      const parsedEvents = await response.json();
+      if (!Array.isArray(parsedEvents)) throw new Error('AI response was not a JSON array of events');
+
+      showAIPreviewModal(parsedEvents);
+    } catch (err) {
+      console.error(err);
+      errorMsg.textContent = 'AI service was busy or failed to parse. Please verify the dates and formatting and try again.';
+      errorMsg.classList.add('active');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Analyze & Parse with AI';
+    }
+  });
+}
+
+function showAIPreviewModal(events) {
+  const modal = document.getElementById('event-modal');
+  const card = document.getElementById('modal-card-content');
+  if (!modal || !card) return;
+
+  let html = `
+    <div class="modal-header">
+      <h3 style="font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.6rem; font-weight: 700; color: var(--wood-dark); display: flex; align-items: center; gap: 8px;">
+        ✨ Review AI Generated Updates
+      </h3>
+      <button class="modal-close" onclick="hideEventModal()">&times;</button>
+    </div>
+    <div style="padding: 20px; max-height: 60vh; overflow-y: auto;" id="ai-preview-list-container">
+      <p style="margin: 0 0 15px 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.4;">
+        We found ${events.length} event(s) in your text. Tweak any values below before posting them to the calendar.
+      </p>
+  `;
+
+  events.forEach((ev, idx) => {
+    const title = ev.title || 'Placement Update';
+    const type = ev.type || 'exams';
+    const date = ev.date || new Date().toISOString().split('T')[0];
+    const mode = ev.mode || 'online';
+    const location = ev.location || 'rvitm';
+    const studentType = ev.studentType || '';
+    const subtypes = Array.isArray(ev.subtypes) ? ev.subtypes : [];
+    const desc = ev.desc || '';
+
+    html += `
+      <div class="ai-event-card" data-index="${idx}" style="border: 1px solid var(--border-gold); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px; background: var(--cream-card); position: relative; text-align: left;">
+        <button type="button" class="ai-delete-card-btn" style="position: absolute; top: 12px; right: 12px; border: none; background: transparent; color: #dc2626; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;" title="Remove this event">&times;</button>
+        
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Company / Title</label>
+          <input type="text" class="preview-title" value="${escapeHTML(title)}" style="width: 100%; padding: 8px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: 'Inter', sans-serif;">
+        </div>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+          <div class="form-group" style="flex: 1; min-width: 120px;">
+            <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Date</label>
+            <input type="date" class="preview-date" value="${date}" style="width: 100%; padding: 8px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: 'Inter', sans-serif; height: 35px; background: white;">
+          </div>
+          <div class="form-group" style="flex: 1; min-width: 120px;">
+            <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Type</label>
+            <select class="preview-type" style="width: 100%; padding: 8px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.85rem; height: 35px; background: white; font-family: 'Inter', sans-serif;">
+              <option value="exams" ${type === 'exams' ? 'selected' : ''}>Interviews & Tests</option>
+              <option value="holidays" ${type === 'holidays' ? 'selected' : ''}>Holidays & Breaks</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+          <div class="form-group" style="flex: 1; min-width: 130px;">
+            <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Drive Format</label>
+            <div class="format-buttons-group" style="display: flex; gap: 6px;">
+              <button type="button" class="format-btn ${mode === 'online' ? 'active' : ''}" data-value="online" style="padding: 6px 12px; font-size: 0.75rem; flex: 1;">Online</button>
+              <button type="button" class="format-btn ${mode === 'offline' ? 'active' : ''}" data-value="offline" style="padding: 6px 12px; font-size: 0.75rem; flex: 1;">Offline</button>
+            </div>
+            <input type="hidden" class="preview-mode" value="${mode}">
+          </div>
+
+          <div class="form-group" style="flex: 2; min-width: 200px;">
+            <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Location</label>
+            <div class="location-buttons-group" style="display: flex; gap: 6px;">
+              <button type="button" class="location-btn ${location === 'rvce' ? 'active' : ''}" data-value="rvce" style="padding: 6px 10px; font-size: 0.75rem; flex: 1;">RVCE</button>
+              <button type="button" class="location-btn ${location === 'rvitm' ? 'active' : ''}" data-value="rvitm" style="padding: 6px 10px; font-size: 0.75rem; flex: 1;">RVITM</button>
+              <button type="button" class="location-btn ${location === 'worksite' ? 'active' : ''}" data-value="worksite" style="padding: 6px 10px; font-size: 0.75rem; flex: 1;">Worksite</button>
+            </div>
+            <input type="hidden" class="preview-location" value="${location}">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Student Type <span class="form-label-optional">(optional)</span></label>
+          <div class="studenttype-buttons-group" style="display: flex; gap: 6px;">
+            <button type="button" class="studenttype-btn ${studentType === 'BE' ? 'active' : ''}" data-value="BE" style="padding: 6px 10px; font-size: 0.75rem; flex: 1;">BE</button>
+            <button type="button" class="studenttype-btn ${studentType === 'MCA' ? 'active' : ''}" data-value="MCA" style="padding: 6px 10px; font-size: 0.75rem; flex: 1;">MCA</button>
+            <button type="button" class="studenttype-btn ${studentType === 'BE | MCA' ? 'active' : ''}" data-value="BE | MCA" style="padding: 6px 10px; font-size: 0.75rem; flex: 1.5;">BE | MCA</button>
+          </div>
+          <input type="hidden" class="preview-studenttype" value="${studentType}">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Rounds</label>
+          <div class="subtypes-buttons-group" style="display: flex; gap: 6px;">
+            <button type="button" class="subtype-btn ${subtypes.includes('OA') ? 'active' : ''}" data-value="OA" style="padding: 6px 12px; font-size: 0.75rem;">OA</button>
+            <button type="button" class="subtype-btn ${subtypes.includes('Technical') ? 'active' : ''}" data-value="Technical" style="padding: 6px 12px; font-size: 0.75rem;">Technical</button>
+          </div>
+          <input type="hidden" class="preview-subtypes" value='${JSON.stringify(subtypes)}'>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Description / Details</label>
+          <textarea class="preview-desc" rows="4" style="width: 100%; padding: 8px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: 'Inter', sans-serif; line-height: 1.4; resize: vertical;">${escapeHTML(desc)}</textarea>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `
+    </div>
+    <div id="ai-preview-error" class="login-error-msg" style="margin: 0 20px 15px 20px;"></div>
+    <div class="form-submit-group" style="display: flex; gap: 12px; justify-content: flex-end; padding: 20px; border-top: 1px solid var(--border-gold); background: var(--cream-dark); border-bottom-left-radius: var(--radius-lg); border-bottom-right-radius: var(--radius-lg);">
+      <button type="button" class="form-cancel-btn" id="ai-preview-back-btn">Back</button>
+      <button type="button" id="ai-post-confirm-btn" class="form-submit-btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 700;">
+        Confirm & Post All
+      </button>
+    </div>
+  `;
+
+  card.innerHTML = html;
+
+  // Bind active togglers for buttons in preview cards
+  const container = document.getElementById('ai-preview-list-container');
+  
+  container.querySelectorAll('.ai-event-card').forEach(cardEl => {
+    // Mode Buttons
+    const modeInput = cardEl.querySelector('.preview-mode');
+    const modeBtns = cardEl.querySelectorAll('.format-btn');
+    modeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('active')) {
+          btn.classList.remove('active');
+          modeInput.value = '';
+        } else {
+          modeBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          modeInput.value = btn.getAttribute('data-value');
+        }
+      });
+    });
+
+    // Location Buttons
+    const locationInput = cardEl.querySelector('.preview-location');
+    const locationBtns = cardEl.querySelectorAll('.location-btn');
+    locationBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('active')) {
+          btn.classList.remove('active');
+          locationInput.value = '';
+        } else {
+          locationBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          locationInput.value = btn.getAttribute('data-value');
+        }
+      });
+    });
+
+    // Student Type Buttons
+    const studentTypeInput = cardEl.querySelector('.preview-studenttype');
+    const studentTypeBtns = cardEl.querySelectorAll('.studenttype-btn');
+    studentTypeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('active')) {
+          btn.classList.remove('active');
+          studentTypeInput.value = '';
+        } else {
+          studentTypeBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          studentTypeInput.value = btn.getAttribute('data-value');
+        }
+      });
+    });
+
+    // Subtype Buttons
+    const subtypesInput = cardEl.querySelector('.preview-subtypes');
+    const subtypeBtns = cardEl.querySelectorAll('.subtype-btn');
+    subtypeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('active');
+        const selected = Array.from(subtypeBtns)
+          .filter(b => b.classList.contains('active'))
+          .map(b => b.getAttribute('data-value'));
+        subtypesInput.value = JSON.stringify(selected);
+      });
+    });
+
+    // Delete Card Button
+    cardEl.querySelector('.ai-delete-card-btn').addEventListener('click', () => {
+      cardEl.remove();
+      if (container.querySelectorAll('.ai-event-card').length === 0) {
+        hideEventModal();
+      }
+    });
+  });
+
+  // Bind back button
+  document.getElementById('ai-preview-back-btn').addEventListener('click', () => {
+    showAIPostModal();
+  });
+
+  // Post Confirm
+  document.getElementById('ai-post-confirm-btn').addEventListener('click', async () => {
+    const confirmBtn = document.getElementById('ai-post-confirm-btn');
+    const errorMsg = document.getElementById('ai-preview-error');
+    const cards = container.querySelectorAll('.ai-event-card');
+    
+    if (cards.length === 0) {
+      hideEventModal();
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `
+      <svg class="spinner" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" style="animation: spin 1s linear infinite; margin-right: 6px; display: inline-block;">
+        <circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-dashoffset="10"/>
+      </svg>
+      Posting Updates...
+    `;
+    errorMsg.classList.remove('active');
+
+    const token = sessionStorage.getItem('adminToken');
+
+    try {
+      for (const cardEl of cards) {
+        const title = cardEl.querySelector('.preview-title').value.trim();
+        const date = cardEl.querySelector('.preview-date').value;
+        const type = cardEl.querySelector('.preview-type').value;
+        const mode = cardEl.querySelector('.preview-mode').value || null;
+        const location = cardEl.querySelector('.preview-location').value || null;
+        const studentType = cardEl.querySelector('.preview-studenttype').value || null;
+        const subtypesVal = cardEl.querySelector('.preview-subtypes').value;
+        const subtypes = subtypesVal ? JSON.parse(subtypesVal) : [];
+        const desc = cardEl.querySelector('.preview-desc').value.trim();
+
+        if (!title || !date) {
+          throw new Error('Title and Date are required for all events.');
+        }
+
+        const newEvent = {
+          id: Date.now() + Math.floor(Math.random() * 10000),
+          title,
+          type,
+          mode,
+          location,
+          studentType,
+          subtypes,
+          date,
+          desc
+        };
+
+        const res = await fetch(`${API}/api/events`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(newEvent)
+        });
+
+        if (!res.ok) throw new Error(`Failed to post event for ${title}`);
+      }
+
+      hideEventModal();
+      await fetchEvents();
+      generateCalendarGrid();
+      generateMiniCalendar();
+      renderAgendaList();
+    } catch (err) {
+      console.error(err);
+      errorMsg.textContent = err.message || 'Failed to post updates. Verify fields and connection.';
+      errorMsg.classList.add('active');
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm & Post All';
+    }
+  });
+}
+
+// Add these to window
+window.showAIPostModal = showAIPostModal;
+window.showAIPreviewModal = showAIPreviewModal;
+
 // Admin Authorization Login Modal Form
 function showLoginModal() {
   const modal = document.getElementById('event-modal');
@@ -2188,34 +2550,70 @@ function renderSPC(container) {
         </div>
       </div>
 
-      <!-- Table-like Heading / Metadata Overview -->
-      <div class="table-wrapper" style="margin-bottom: 30px;">
-        <table class="spc-meta-table">
-          <thead>
-            <tr>
-              <th>Resource Name</th>
-              <th>Access Level</th>
-              <th>Target Directory</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td data-label="Resource Name" style="font-weight: 600; color: var(--wood-dark);">SPC Master Database</td>
-              <td data-label="Access Level">Placement Coordinator (Read/Write)</td>
-              <td data-label="Target Directory">Google Cloud Registry</td>
-              <td data-label="Status"><span class="status-badge status-p">ACTIVE SYNC</span></td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Priority Drive Card -->
+      <div class="spc-drive-card" style="margin-bottom: 20px; background: var(--cream-card); border: 1px solid var(--border-gold); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-premium); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 16px; min-width: 250px;">
+          <!-- Folder SVG Icon -->
+          <div style="background: #fff7ed; padding: 12px; border-radius: 50%; color: #c2410c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <h3 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.4rem; font-weight: 700; color: var(--wood-dark);">All Placement Data Drive</h3>
+              <span style="font-size: 0.65rem; font-weight: 800; background: #fff7ed; color: #c2410c; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid #ffedd5;">Priority</span>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">Central Google Drive repository for student resumes, criteria spreadsheets, and recruitment drives data.</p>
+          </div>
+        </div>
+        <a href="https://drive.google.com/drive/folders/1TH8qfWIIXuux1p9MCMqZ0MD3_7JlzIj7?usp=sharing" target="_blank" class="spc-open-btn" style="flex-shrink: 0; padding: 10px 18px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; background-color: var(--wood-dark); color: var(--gold-light); border-color: var(--wood-dark);">
+          Open Placement Drive
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Students Database Card -->
+      <div class="spc-drive-card" style="margin-bottom: 30px; background: var(--cream-card); border: 1px solid var(--border-gold); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-premium); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 16px; min-width: 250px;">
+          <!-- Spreadsheet SVG Icon -->
+          <div style="background: #ecfdf5; padding: 12px; border-radius: 50%; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <h3 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.4rem; font-weight: 700; color: var(--wood-dark);">Students Database</h3>
+              <span style="font-size: 0.65rem; font-weight: 800; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid #bae6fd;">Active</span>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">Master spreadsheet tracking student registrations, branch details, eligibility parameters, and contact info.</p>
+          </div>
+        </div>
+        <a href="https://docs.google.com/spreadsheets/d/11XeRRSKqICTTqZ_-_g-z1yYnSU_yTiBVFf6fxQBbku8/edit?usp=sharing" target="_blank" class="spc-open-btn" style="flex-shrink: 0; padding: 10px 18px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; background-color: var(--wood-dark); color: var(--gold-light); border-color: var(--wood-dark);">
+          Open Students Database
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
       </div>
 
       <!-- Embedded Spreadsheet -->
       <div class="spc-spreadsheet-container">
         <div class="spc-spreadsheet-header">
-          <span>Google Sheets Live Preview</span>
+          <span>Placed Data (Live Preview)</span>
           <a href="https://docs.google.com/spreadsheets/d/1eiLJQ0l6RjVPSlxjdivoiY2kcDNdFGhkFpVDHYxCTV0/edit?usp=sharing" target="_blank" class="spc-open-btn">
-            Open in Sheets
+            Open Placed Data
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
               <polyline points="15 3 21 3 21 9"/>
