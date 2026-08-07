@@ -78,6 +78,10 @@
   --cat-technical-txt: #9d174d;
   --cat-technical-border: #fbcfe8;
 
+  --cat-ppt-bg: #fff7ed;
+  --cat-ppt-txt: #c2410c;
+  --cat-ppt-border: #ffedd5;
+
   /* Shadows and Radii */
   --shadow-premium: 0 8px 30px rgba(42, 27, 17, 0.06);
   --shadow-gold: 0 10px 25px rgba(197, 160, 89, 0.18);
@@ -1664,13 +1668,15 @@ tr:hover td {
   border-color: var(--cat-offline-border);
 }
 
-.location-btn.active[data-value="oncampus"] {
+.location-btn.active[data-value="oncampus"],
+.location-btn.active[data-value="rvitm"] {
   background-color: var(--cat-oncampus-bg);
   color: var(--cat-oncampus-txt);
   border-color: var(--cat-oncampus-border);
 }
 
-.location-btn.active[data-value="offcampus"] {
+.location-btn.active[data-value="offcampus"],
+.location-btn.active[data-value="rvce"] {
   background-color: var(--cat-offcampus-bg);
   color: var(--cat-offcampus-txt);
   border-color: var(--cat-offcampus-border);
@@ -1773,6 +1779,12 @@ tr:hover td {
   background-color: var(--cat-technical-bg);
   color: var(--cat-technical-txt);
   border-color: var(--cat-technical-border);
+}
+
+.subtype-btn.active[data-value="PPT"] {
+  background-color: var(--cat-ppt-bg);
+  color: var(--cat-ppt-txt);
+  border-color: var(--cat-ppt-border);
 }
 
 /* Event Pill Mode Tags */
@@ -1930,6 +1942,12 @@ tr:hover td {
   background-color: var(--cat-technical-bg);
   color: var(--cat-technical-txt);
   border: 1px solid var(--cat-technical-border);
+}
+
+.modal-subtype-badge.subtype-ppt {
+  background-color: var(--cat-ppt-bg);
+  color: var(--cat-ppt-txt);
+  border: 1px solid var(--cat-ppt-border);
 }
 
 /* Toast Notification */
@@ -2234,6 +2252,12 @@ tr:hover td {
   background-color: var(--cat-technical-bg);
   color: var(--cat-technical-txt);
   border: 1px solid var(--cat-technical-border);
+}
+
+.agenda-subtype-tag.subtype-ppt {
+  background-color: var(--cat-ppt-bg);
+  color: var(--cat-ppt-txt);
+  border: 1px solid var(--cat-ppt-border);
 }
 
 .agenda-event-title {

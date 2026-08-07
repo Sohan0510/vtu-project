@@ -1346,6 +1346,7 @@ function showEditEventModal(event) {
       <div class="form-group">
         <label>Rounds</label>
         <div class="subtypes-buttons-group">
+          <button type="button" class="subtype-btn" data-value="PPT">PPT</button>
           <button type="button" class="subtype-btn" data-value="OA">OA</button>
           <button type="button" class="subtype-btn" data-value="Technical">Technical</button>
         </div>
@@ -1561,6 +1562,7 @@ function showCreateEventModal(dateStr) {
       <div class="form-group">
         <label>Rounds</label>
         <div class="subtypes-buttons-group">
+          <button type="button" class="subtype-btn" data-value="PPT">PPT</button>
           <button type="button" class="subtype-btn" data-value="OA">OA</button>
           <button type="button" class="subtype-btn" data-value="Technical">Technical</button>
         </div>
@@ -1880,6 +1882,7 @@ function showAIPreviewModal(events) {
         <div class="form-group" style="margin-bottom: 12px;">
           <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Rounds</label>
           <div class="subtypes-buttons-group" style="display: flex; gap: 6px;">
+            <button type="button" class="subtype-btn ${subtypes.includes('PPT') ? 'active' : ''}" data-value="PPT" style="padding: 6px 12px; font-size: 0.75rem;">PPT</button>
             <button type="button" class="subtype-btn ${subtypes.includes('OA') ? 'active' : ''}" data-value="OA" style="padding: 6px 12px; font-size: 0.75rem;">OA</button>
             <button type="button" class="subtype-btn ${subtypes.includes('Technical') ? 'active' : ''}" data-value="Technical" style="padding: 6px 12px; font-size: 0.75rem;">Technical</button>
           </div>

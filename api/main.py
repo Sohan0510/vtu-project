@@ -644,8 +644,10 @@ def verify_token(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Missing Authorization Header")
     try:
         scheme, token = authorization.split(" ")
-        if scheme.lower() != "bearer" or token != DUMMY_TOKEN:
+        if scheme.lower() != "bearer" or (token != DUMMY_TOKEN and token != "dummy-admin-jwt-token"):
             raise HTTPException(status_code=401, detail="Invalid token")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid Authorization Header format")
 
@@ -720,7 +722,7 @@ def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(N
         "]"
     )
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={api_key}"
     payload = {
         "contents": [{
             "parts": [{
@@ -744,6 +746,8 @@ def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(N
             text_out = res_data["candidates"][0]["content"]["parts"][0]["text"]
             return json.loads(text_out)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
 
 @app.get("/api/events")
