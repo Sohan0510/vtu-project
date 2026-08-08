@@ -1182,8 +1182,7 @@ tr:hover td {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-auto-rows: minmax(110px, 1fr);
-  background-color: var(--border-gold); /* fallback for cell border lines */
-  gap: 1px;
+  border-left: 1px solid var(--border-gold);
 }
 
 .calendar-day-cell {
@@ -1193,6 +1192,8 @@ tr:hover td {
   flex-direction: column;
   gap: 6px;
   position: relative;
+  border-right: 1px solid var(--border-gold);
+  border-bottom: 1px solid var(--border-gold);
 }
 
 .calendar-day-cell.prev-month,
@@ -2476,7 +2477,6 @@ tr:hover td {
     width: 150% !important;
     min-width: unset !important;
     grid-auto-rows: auto !important;
-    gap: 1px !important;
   }
   /* Keep header width in sync with the scrollable grid body */
   .calendar-grid-header {
