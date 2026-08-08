@@ -685,14 +685,14 @@ class AIParseRequest(BaseModel):
 
 @app.post("/api/ai/parse")
 def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(None)):
-    """Parse raw text into placement events using Gemini API with obfuscated key."""
+    """Parse raw text into placement events using Gemini API."""
     verify_token(authorization)
     import urllib.request
     import json
     
-    # Obfuscated key to prevent GitHub revocation
-    key_parts = ["AIza", "SyDF8jEKHwyhWt8v7", "K_UNiGsVq_g_4je37c"]
-    api_key = "".join(key_parts)
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured in environment variables.")
     
     system_instruction = (
         "You are a strict parser that extracts placement drive updates from raw text and formats them as a JSON array of events.\n"

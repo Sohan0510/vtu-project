@@ -22,6 +22,7 @@ services:
       - TESSERACT_PATH=/usr/bin/tesseract
       - ADMIN_ID=${ADMIN_ID:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - mongodb
     restart: unless-stopped
