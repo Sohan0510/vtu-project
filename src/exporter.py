@@ -218,7 +218,18 @@ def export_to_excel(results, prefix="results"):
         
         # Backlog fields
         active_backlog_count = student.get("active_backlog_count", failed)
-        historical_backlogs = student.get("historical_backlogs", active_backlog_count > 0)
+        
+        # Filter legacy same-semester clearances for accurate historical flag
+        valid_history_count = 0
+        for entry in student.get("backlog_history", []):
+            cleared_sem = get_semester_from_url(entry.get("cleared_in_url", ""), default_val=entry.get("cleared_in_sem", "-"))
+            f_int = _sem_to_int(entry.get("failed_in_sem", "-"))
+            c_int = _sem_to_int(cleared_sem)
+            is_makeup = isinstance(cleared_sem, str) and ("Makeup" in cleared_sem or "Summer" in cleared_sem)
+            if is_makeup or (c_int and f_int and c_int > f_int):
+                valid_history_count += 1
+                
+        historical_backlogs = (valid_history_count > 0) or (active_backlog_count > 0)
         historical_text = "YES" if historical_backlogs else "NO"
         
         if overall == "PASS":
@@ -559,6 +570,11 @@ def export_to_excel(results, prefix="results"):
             
             c_int = _sem_to_int(cleared_sem)
             f_int = _sem_to_int(failed_sem)
+            
+            is_makeup = isinstance(cleared_sem, str) and ("Makeup" in cleared_sem or "Summer" in cleared_sem)
+            if not is_makeup and c_int and f_int and c_int <= f_int:
+                continue # Skip same-semester reval clearances for legacy data
+                
             if c_int and f_int and c_int >= f_int:
                 duration = max(1, c_int - f_int)
             else:

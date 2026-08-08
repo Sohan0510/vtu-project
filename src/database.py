@@ -87,6 +87,8 @@ def _detect_backlog_clearances(old_subjects, new_subjects, new_url):
     """
     Detects subjects that transitioned from F/A → P between old and new scrape.
     Returns list of clearance records based on the URL / semester session.
+    Ignores clearances that happened in the same semester (i.e. Revaluation passes).
+    Includes clearances from Makeup/Summer exams or subsequent semesters.
     """
     clearances = []
     now = datetime.utcnow().isoformat()
@@ -114,6 +116,13 @@ def _detect_backlog_clearances(old_subjects, new_subjects, new_url):
             
             c_int = _to_int_sem(cleared_sem)
             f_int = _to_int_sem(old_sem)
+            
+            is_makeup_or_summer = isinstance(cleared_sem, str) and ("Makeup" in cleared_sem or "Summer" in cleared_sem)
+            
+            # If cleared in same semester (and not a makeup/summer exam), it's a reval pass, NOT a backlog clearance.
+            if not is_makeup_or_summer and c_int <= f_int:
+                continue
+                
             duration = max(1, c_int - f_int) if (c_int and f_int and c_int >= f_int) else 1
             
             clearances.append({
@@ -259,8 +268,9 @@ def _handle_reval_update(usn, name, new_subjects, old_subjects,
         
         # Compute new backlog state
         active_backlogs, active_backlog_count = _compute_backlog_state(merged_subjects)
-        had_historical = existing_record.get("historical_backlogs", False)
-        historical_backlogs = had_historical or len(new_clearances) > 0
+        
+        # Historical flag: true if they ever cleared a backlog (backlog_history) or currently have one
+        historical_backlogs = len(backlog_history) > 0 or active_backlog_count > 0
         
         collection.update_one(
             {"usn": usn},
@@ -322,11 +332,8 @@ def _handle_normal_merge(usn, name, new_subjects, old_subjects,
     # Compute current backlog state from merged subjects
     active_backlogs, active_backlog_count = _compute_backlog_state(merged_subjects)
     
-    # Historical flag: true if student EVER had a backlog
-    had_historical = existing_record.get("historical_backlogs", False)
-    # Also check if ANY old subjects were F (they might now be overwritten as P)
-    had_old_fails = any(s.get("status") in ("F", "A") for s in old_subjects.values())
-    historical_backlogs = had_historical or had_old_fails or len(new_clearances) > 0 or active_backlog_count > 0
+    # Historical flag: true if they ever cleared a backlog (backlog_history) or currently have one
+    historical_backlogs = len(backlog_history) > 0 or active_backlog_count > 0
     
     collection.update_one(
         {"usn": usn},
