@@ -930,13 +930,20 @@ function generateCalendarGrid() {
     cell.innerHTML = cellContent;
     gridContainer.appendChild(cell);
 
-    // Bind click listener on day cell for selection and admin placement event insertion
     cell.addEventListener('click', (e) => {
       // Do not trigger selection change if user clicks directly on an existing event pill
       if (e.target.closest('.calendar-event-pill')) return;
 
       selectedCalendarDate = new Date(year, month, d);
       generateCalendarGrid();
+
+      // Auto-scroll down to the agenda view where events are shown
+      const agendaView = document.getElementById('calendar-agenda-view');
+      if (agendaView) {
+        setTimeout(() => {
+          agendaView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
 
       // Only show the direct create modal if Admin and on desktop (width > 768px)
       // Mobile admins will use the "Add Update" button inside the Agenda view
