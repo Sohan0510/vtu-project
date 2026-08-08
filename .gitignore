@@ -4,5 +4,4 @@ temp/
 __pycache__/
 exports/
 compare.html
-fast-student-api/
 url_usage_report.py

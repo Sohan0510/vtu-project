@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/results/:usn",
+      "destination": "/api/index.js?usn=:usn"
+    },
+    {
+      "source": "/api/auth",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/verify",
+      "destination": "/api/verify.js"
+    },
+    {
+      "source": "/api/events",
+      "destination": "/api/events.js"
+    },
+    {
+      "source": "/api/ai/parse",
+      "destination": "/api/parse.js"
+    }
+  ]
+}
