@@ -4,6 +4,7 @@
   "description": "Vercel Serverless API for VTU Results",
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "dotenv": "^17.4.2",
     "googleapis": "^134.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.3.0"
