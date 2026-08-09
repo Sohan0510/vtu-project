@@ -684,10 +684,10 @@ function renderCalendar(container) {
               </div>
             </div>
             <div class="toolbar-right" style="display: flex; gap: 10px;">
-              <a href="https://calendar.google.com/calendar/r?cid=830563c902db01ba6c39b8914eb647d8954734b8299b1d23fafb10c462e263a0@group.calendar.google.com" target="_blank" class="toolbar-btn" style="background: #4285F4; color: white; border: none; text-decoration: none; display: flex; align-items: center; gap: 8px;">
+              <button onclick="showSubscribeModal()" class="toolbar-btn" style="background: #4285F4; color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 10H21" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H12.01" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Subscribe
-              </a>
+              </button>
             </div>
           </div>
 
@@ -1186,6 +1186,34 @@ function hideEventModal() {
   if (modal) modal.classList.remove('active');
 }
 window.hideEventModal = hideEventModal;
+
+// Subscribe Modal View
+function showSubscribeModal() {
+  const modal = document.getElementById('event-modal');
+  const card = document.getElementById('modal-card-content');
+  
+  card.innerHTML = `
+    <div class="modal-header">
+      <span class="modal-category event-exams" style="background: #4285F4; color: white;">Google Calendar Sync</span>
+      <button class="modal-close" onclick="hideEventModal()">&times;</button>
+    </div>
+    <div style="padding: 10px 0;">
+      <p style="margin-bottom: 15px; line-height: 1.5; color: #333;">
+        You are about to subscribe to the live <strong>VTU Placement Calendar</strong>. All placement drives, exams, and holidays will be automatically added to your personal Google Calendar and will stay updated in real-time.
+      </p>
+      <div style="background: #f8f9fa; border-left: 4px solid #fbbc05; padding: 12px; border-radius: 4px; margin-bottom: 20px;">
+        <strong style="display: block; margin-bottom: 5px; color: #d93025;">💡 Pro Tip: Homescreen Widget</strong>
+        <p style="margin: 0; font-size: 14px; color: #555;">After subscribing, add a Google Calendar widget directly to your phone's homescreen. You will instantly see all live placement updates at a glance without even opening the app!</p>
+      </div>
+      <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="modal-btn cancel-btn" onclick="hideEventModal()" style="padding: 10px 16px; border-radius: 8px; border: 1px solid #ccc; background: white; cursor: pointer;">Cancel</button>
+        <a href="https://calendar.google.com/calendar/r?cid=830563c902db01ba6c39b8914eb647d8954734b8299b1d23fafb10c462e263a0@group.calendar.google.com" target="_blank" onclick="hideEventModal()" class="modal-btn" style="padding: 10px 16px; border-radius: 8px; border: none; background: #4285F4; color: white; cursor: pointer; text-decoration: none;">Continue to Calendar</a>
+      </div>
+    </div>
+  `;
+  modal.classList.add('active');
+}
+window.showSubscribeModal = showSubscribeModal;
 
 // Visitor Details View
 function showEventDetailModalVisitor(event) {
