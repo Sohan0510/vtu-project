@@ -1215,6 +1215,64 @@ function showSubscribeModal() {
 }
 window.showSubscribeModal = showSubscribeModal;
 
+// Single Event Email Invite UI
+function showEmailInviteUI(eventId) {
+  const container = document.getElementById('modal-actions-container');
+  if (!container) return;
+  container.innerHTML = `
+    <div style="display: flex; flex-direction: column; width: 100%; gap: 10px;">
+      <label style="font-size: 0.85rem; color: #555; font-weight: 500;">Enter your email to receive live updates for this event:</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="email" id="invite-email-input" placeholder="student@example.com" style="flex-grow: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; outline: none;">
+        <button onclick="submitEmailInvite(${eventId})" style="padding: 8px 16px; border: none; border-radius: 6px; background: #4285F4; color: white; font-weight: 600; cursor: pointer;">Send Invite</button>
+      </div>
+      <div id="invite-msg" style="font-size: 0.85rem; color: #d93025; margin-top: 4px; display: none;"></div>
+    </div>
+  `;
+}
+window.showEmailInviteUI = showEmailInviteUI;
+
+async function submitEmailInvite(eventId) {
+  const emailInput = document.getElementById('invite-email-input');
+  const msgDiv = document.getElementById('invite-msg');
+  const email = emailInput.value.trim();
+  
+  if (!email || !email.includes('@')) {
+    msgDiv.textContent = 'Please enter a valid email address.';
+    msgDiv.style.color = '#d93025';
+    msgDiv.style.display = 'block';
+    return;
+  }
+  
+  emailInput.disabled = true;
+  msgDiv.textContent = 'Sending invite...';
+  msgDiv.style.color = '#555';
+  msgDiv.style.display = 'block';
+  
+  try {
+    const res = await fetch(`${API}/api/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'invite', id: eventId, email: email })
+    });
+    
+    const data = await res.json();
+    if (res.ok) {
+      msgDiv.textContent = '🎉 ' + data.detail;
+      msgDiv.style.color = '#188038';
+    } else {
+      msgDiv.textContent = '❌ ' + (data.detail || 'Failed to send invite.');
+      msgDiv.style.color = '#d93025';
+      emailInput.disabled = false;
+    }
+  } catch (err) {
+    msgDiv.textContent = '❌ Network error. Please try again.';
+    msgDiv.style.color = '#d93025';
+    emailInput.disabled = false;
+  }
+}
+window.submitEmailInvite = submitEmailInvite;
+
 // Visitor Details View
 function showEventDetailModalVisitor(event) {
   const modal = document.getElementById('event-modal');
@@ -1251,7 +1309,13 @@ function showEventDetailModalVisitor(event) {
     </div>
     <h3 class="modal-title">${escapeHTML(event.title)}</h3>
     <div class="modal-date">${dateStr}</div>
-    <div class="modal-desc">${formatEventDescription(event.desc)}</div>
+    <div class="modal-desc" style="margin-bottom: 20px;">${formatEventDescription(event.desc)}</div>
+    <div id="modal-actions-container" class="modal-actions" style="display: flex; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 15px;">
+      <button onclick="showEmailInviteUI(${event.id})" class="modal-btn" style="padding: 8px 14px; border-radius: 6px; border: none; background: #f8f9fa; color: #4285F4; border: 1px solid #4285F4; cursor: pointer; text-decoration: none; display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 0.85rem; transition: background 0.2s;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z" stroke="#4285F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 2V6" stroke="#4285F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 2V6" stroke="#4285F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 10H21" stroke="#4285F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H12.01" stroke="#4285F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Subscribe for Live Updates
+      </button>
+    </div>
   `;
   modal.classList.add('active');
 }
