@@ -89,67 +89,14 @@ module.exports = async function (req, res) {
       return res.status(200).json(cleanedEvents);
     }
 
-    // POST /api/events - Handle invites (No JWT required) OR create new event (JWT required)
+    // Require authentication for POST, PUT, DELETE
+    if (!verifyAdmin(req)) {
+      return res.status(401).json({ detail: 'Unauthorized. Invalid or missing admin token.' });
+    }
+
+    // POST /api/events - Create new event
     if (req.method === 'POST') {
-      const { action, id, email, title, type, mode, location, subtypes, date, desc } = req.body || {};
-      
-      // -- SINGLE EVENT EMAIL INVITE LOGIC --
-      if (action === 'invite') {
-        if (typeof id !== 'number' || !email || typeof email !== 'string') {
-          return res.status(400).json({ detail: 'Invalid event ID or email.' });
-        }
-        
-        const existingEvent = await collection.findOne({ id: Number(id) });
-        if (!existingEvent || !existingEvent.googleEventId) {
-          return res.status(404).json({ detail: 'Event not found or not synced to Google Calendar yet.' });
-        }
-
-        const calendarId = process.env.GOOGLE_CALENDAR_ID;
-        const auth = getGoogleAuth();
-        
-        if (auth && calendarId) {
-          try {
-            const calendar = google.calendar({ version: 'v3', auth });
-            
-            // 1. Fetch current event to get existing attendees
-            const currentEvent = await calendar.events.get({
-              calendarId: calendarId,
-              eventId: existingEvent.googleEventId,
-            });
-            
-            let attendees = currentEvent.data.attendees || [];
-            
-            // 2. Check if already invited
-            if (attendees.some(a => a.email.toLowerCase() === email.toLowerCase())) {
-              return res.status(200).json({ detail: 'You are already subscribed to this event!' });
-            }
-            
-            // 3. Append new email
-            attendees.push({ email: email });
-            
-            // 4. Update the event with sendUpdates: 'all' to trigger email invite
-            await calendar.events.patch({
-              calendarId: calendarId,
-              eventId: existingEvent.googleEventId,
-              sendUpdates: 'all',
-              resource: {
-                attendees: attendees
-              }
-            });
-            
-            return res.status(200).json({ detail: 'Invite sent successfully!' });
-          } catch (err) {
-            console.error("Google Calendar Invite Error:", err);
-            return res.status(500).json({ detail: 'Failed to send invite via Google Calendar.' });
-          }
-        }
-        return res.status(500).json({ detail: 'Server misconfigured for Google Calendar API.' });
-      }
-
-      // -- EVENT CREATION LOGIC (Requires Admin) --
-      if (!verifyAdmin(req)) {
-        return res.status(401).json({ detail: 'Unauthorized. Invalid or missing admin token.' });
-      }
+      const { id, title, type, mode, location, subtypes, date, desc } = req.body || {};
       
       // Strict type checking to prevent NoSQL injection
       if (typeof id !== 'number' || typeof title !== 'string' || typeof type !== 'string' || typeof date !== 'string' || typeof desc !== 'string') {
@@ -168,15 +115,12 @@ module.exports = async function (req, res) {
           nextDay.setDate(nextDay.getDate() + 1);
           const nextDayStr = nextDay.toISOString().split('T')[0];
           
-            const gCalEvent = {
-              summary: title,
-              description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : ''),
-              start: { date: date }, // all-day event format
-              end: { date: nextDayStr }, // exclusive end date
-              guestsCanModify: false,
-              guestsCanInviteOthers: false,
-              guestsCanSeeOtherGuests: false
-            };
+          const gCalEvent = {
+            summary: title,
+            description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : ''),
+            start: { date: date }, // all-day event format
+            end: { date: nextDayStr }, // exclusive end date
+          };
           
           const response = await calendar.events.insert({
             calendarId: calendarId,
@@ -206,9 +150,6 @@ module.exports = async function (req, res) {
 
     // PUT /api/events - Update existing event
     if (req.method === 'PUT') {
-      if (!verifyAdmin(req)) {
-        return res.status(401).json({ detail: 'Unauthorized. Invalid or missing admin token.' });
-      }
       const { id, title, type, mode, location, subtypes, date, desc } = req.body || {};
       
       if (typeof id !== 'number') {
@@ -246,9 +187,6 @@ module.exports = async function (req, res) {
             description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : ''),
             start: { date: date },
             end: { date: nextDayStr },
-            guestsCanModify: false,
-            guestsCanInviteOthers: false,
-            guestsCanSeeOtherGuests: false
           };
           
           await calendar.events.update({
@@ -268,9 +206,6 @@ module.exports = async function (req, res) {
 
     // DELETE /api/events - Delete existing event
     if (req.method === 'DELETE') {
-      if (!verifyAdmin(req)) {
-        return res.status(401).json({ detail: 'Unauthorized. Invalid or missing admin token.' });
-      }
       const { id } = req.body || {};
       
       if (typeof id !== 'number') {
