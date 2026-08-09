@@ -1,5 +1,6 @@
 const { MongoClient } = require('mongodb');
 const jwt = require('jsonwebtoken');
+const { google } = require('googleapis');
 
 // Cached connection for performance
 let cachedClient = null;
@@ -34,6 +35,30 @@ function verifyAdmin(req) {
     return false;
   }
 }
+
+// Initialize Google Calendar Auth
+const getGoogleAuth = () => {
+  const credentials = {
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    private_key: process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : null,
+  };
+
+  if (!credentials.client_email || !credentials.private_key) {
+    return null;
+  }
+
+  try {
+    return new google.auth.JWT(
+      credentials.client_email,
+      null,
+      credentials.private_key,
+      ['https://www.googleapis.com/auth/calendar.events']
+    );
+  } catch(err) {
+    console.error('Google Auth Error', err);
+    return null;
+  }
+};
 
 module.exports = async function (req, res) {
   // CORS Headers
@@ -78,6 +103,35 @@ module.exports = async function (req, res) {
         return res.status(400).json({ detail: 'Invalid input format.' });
       }
 
+      let googleEventId = null;
+      const calendarId = process.env.GOOGLE_CALENDAR_ID;
+      const auth = getGoogleAuth();
+      
+      if (auth && calendarId) {
+        try {
+          const calendar = google.calendar({ version: 'v3', auth });
+          const eventDate = new Date(date);
+          const nextDay = new Date(eventDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          const nextDayStr = nextDay.toISOString().split('T')[0];
+          
+          const gCalEvent = {
+            summary: title,
+            description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : ''),
+            start: { date: date }, // all-day event format
+            end: { date: nextDayStr }, // exclusive end date
+          };
+          
+          const response = await calendar.events.insert({
+            calendarId: calendarId,
+            resource: gCalEvent,
+          });
+          googleEventId = response.data.id;
+        } catch (err) {
+          console.error("Google Calendar Insert Error:", err);
+        }
+      }
+
       const newEvent = {
         id: Number(id), // Force number type
         title: String(title).trim(),
@@ -86,7 +140,8 @@ module.exports = async function (req, res) {
         location: location ? String(location).trim() : null,
         subtypes: Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()) : [],
         date: String(date).trim(),
-        desc: String(desc).trim()
+        desc: String(desc).trim(),
+        googleEventId: googleEventId
       };
 
       await collection.insertOne(newEvent);
@@ -101,6 +156,10 @@ module.exports = async function (req, res) {
         return res.status(400).json({ detail: 'Invalid event ID.' });
       }
 
+      // Query by ID (force Number to prevent injection passing objects like {$ne: null})
+      const query = { id: Number(id) };
+      const existingEvent = await collection.findOne(query);
+
       const updatedFields = {
         title: String(title).trim(),
         type: String(type).trim(),
@@ -111,8 +170,35 @@ module.exports = async function (req, res) {
         desc: String(desc).trim()
       };
 
-      // Query by ID (force Number to prevent injection passing objects like {$ne: null})
-      const query = { id: Number(id) };
+      const googleEventId = existingEvent?.googleEventId;
+      const calendarId = process.env.GOOGLE_CALENDAR_ID;
+      const auth = getGoogleAuth();
+
+      if (googleEventId && auth && calendarId) {
+        try {
+          const calendar = google.calendar({ version: 'v3', auth });
+          const eventDate = new Date(date);
+          const nextDay = new Date(eventDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          const nextDayStr = nextDay.toISOString().split('T')[0];
+          
+          const gCalEvent = {
+            summary: title,
+            description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : ''),
+            start: { date: date },
+            end: { date: nextDayStr },
+          };
+          
+          await calendar.events.update({
+            calendarId: calendarId,
+            eventId: googleEventId,
+            resource: gCalEvent,
+          });
+        } catch (err) {
+          console.error("Google Calendar Update Error:", err);
+        }
+      }
+
       await collection.updateOne(query, { $set: updatedFields });
       
       return res.status(200).json({ detail: 'Event updated.' });
@@ -127,6 +213,24 @@ module.exports = async function (req, res) {
       }
 
       const query = { id: Number(id) };
+      const existingEvent = await collection.findOne(query);
+
+      const googleEventId = existingEvent?.googleEventId;
+      const calendarId = process.env.GOOGLE_CALENDAR_ID;
+      const auth = getGoogleAuth();
+
+      if (googleEventId && auth && calendarId) {
+        try {
+          const calendar = google.calendar({ version: 'v3', auth });
+          await calendar.events.delete({
+            calendarId: calendarId,
+            eventId: googleEventId,
+          });
+        } catch (err) {
+          console.error("Google Calendar Delete Error:", err);
+        }
+      }
+
       await collection.deleteOne(query);
       
       return res.status(200).json({ detail: 'Event deleted.' });
