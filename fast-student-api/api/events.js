@@ -235,8 +235,6 @@ module.exports = async function (req, res) {
       
       return res.status(200).json({ detail: 'Event deleted.' });
     }
-
-    // Unsupported method
     return res.status(405).json({ detail: 'Method not allowed' });
 
   } catch (error) {
