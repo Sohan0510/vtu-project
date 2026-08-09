@@ -1199,7 +1199,7 @@ function showSubscribeModal() {
     </div>
     <div style="padding: 10px 0;">
       <p style="margin-bottom: 15px; line-height: 1.5; color: #333;">
-        You are about to subscribe to the live <strong>VTU Placement Calendar</strong>. All placement drives, exams, and holidays will be automatically added to your personal Google Calendar and will stay updated in real-time.
+        You are about to subscribe to the live <strong>Placement Calendar</strong>. All placement drives, exams, and holidays will be automatically added to your personal Google Calendar and will stay updated in real-time.
       </p>
       <div style="background: #f8f9fa; border-left: 4px solid #fbbc05; padding: 12px; border-radius: 4px; margin-bottom: 20px;">
         <strong style="display: block; margin-bottom: 5px; color: #d93025;">💡 Pro Tip: Homescreen Widget</strong>
