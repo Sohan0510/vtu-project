@@ -1162,10 +1162,12 @@ tr:hover td {
 /* Grid Header */
 .calendar-grid-header {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   text-align: center;
+  border-left: 1px solid var(--border-gold);
   border-bottom: 1px solid var(--border-gold);
   background-color: var(--bg-parchment);
+  box-sizing: border-box;
 }
 
 .calendar-grid-header div {
@@ -1175,14 +1177,21 @@ tr:hover td {
   text-transform: uppercase;
   color: var(--wood-light);
   letter-spacing: 0.05em;
+  border-right: 1px solid var(--border-gold);
+  box-sizing: border-box;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Grid Body Cell */
 .calendar-grid-body {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-auto-rows: minmax(110px, 1fr);
   border-left: 1px solid var(--border-gold);
+  box-sizing: border-box;
 }
 
 .calendar-day-cell {
@@ -1194,6 +1203,8 @@ tr:hover td {
   position: relative;
   border-right: 1px solid var(--border-gold);
   border-bottom: 1px solid var(--border-gold);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .calendar-day-cell.prev-month,
@@ -2466,7 +2477,6 @@ tr:hover td {
   }
 
   .calendar-grid-scroll-wrapper {
-    scroll-snap-type: x mandatory;
     /* subtle edge fade to indicate swipeability on mobile */
     mask-image: linear-gradient(to right, #000 0%, #000 92%, transparent 100%);
     -webkit-mask-image: linear-gradient(to right, #000 0%, #000 92%, transparent 100%);
@@ -2474,18 +2484,18 @@ tr:hover td {
 
   /* Use auto row height so cells can expand to fit events + +N more badge */
   .calendar-grid-body {
-    width: 150% !important;
-    min-width: unset !important;
+    width: 100% !important;
+    min-width: 580px !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     grid-auto-rows: auto !important;
+    box-sizing: border-box !important;
   }
-  /* Keep header width in sync with the scrollable grid body */
+  /* Keep header width in exact sync with the scrollable grid body */
   .calendar-grid-header {
-    width: 150% !important;
-    min-width: unset !important;
-  }
-  .calendar-grid-header div,
-  .calendar-day-cell {
-    scroll-snap-align: start;
+    width: 100% !important;
+    min-width: 580px !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    box-sizing: border-box !important;
   }
 
   /* --- Mobile day cell: auto height, snug padding --- */
