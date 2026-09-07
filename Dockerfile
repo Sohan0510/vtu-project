@@ -18,7 +18,6 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p static temp exports
 
-ENV MONGO_URI="mongodb://mongodb:27017/"
 ENV TESSERACT_PATH="/usr/bin/tesseract"
 
 EXPOSE 8000

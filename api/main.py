@@ -630,7 +630,7 @@ if mongo_uri_env and ("mongodb+srv://" in mongo_uri_env or ("localhost" not in m
 events_collection = None
 if USE_MONGO_FOR_EVENTS:
     try:
-        events_collection = db["events"]
+        events_collection = db["calendar_events"]
         # Seed events from JSON if collection is empty
         if events_collection.count_documents({}) == 0:
             example_events = load_events_from_json()

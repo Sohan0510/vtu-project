@@ -1,13 +1,4 @@
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: vtu_mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    restart: unless-stopped
-
   backend:
     build:
       context: .
@@ -23,8 +14,6 @@ services:
       - ADMIN_ID=${ADMIN_ID:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-    depends_on:
-      - mongodb
     restart: unless-stopped
 
   frontend:
@@ -38,5 +27,3 @@ services:
       - backend
     restart: unless-stopped
 
-volumes:
-  mongodb_data:
