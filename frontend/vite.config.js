@@ -15,7 +15,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        urmom: resolve(__dirname, 'urmom/index.html')
+        scraper: resolve(__dirname, 'scraper/index.html')
       }
     }
   }

@@ -88,7 +88,7 @@ docker-compose up -d --build
 | Service                   | URL                                                      |
 | ------------------------- | -------------------------------------------------------- |
 | **Student Portal**        | [http://localhost](http://localhost)                     |
-| **Admin Dashboard**       | [http://localhost/urmom](http://localhost/urmom)         |
+| **Admin Dashboard**       | [http://localhost/scraper](http://localhost/scraper)     |
 | **API Docs (Swagger)**    | [http://localhost:8000/docs](http://localhost:8000/docs) |
 | **MongoDB** (for Compass) | `mongodb://localhost:27017/`                             |
 
@@ -98,7 +98,7 @@ docker-compose up -d --build
 
 ### Scraping Results (Admin Dashboard)
 
-1. Open the **Admin Dashboard** at `http://localhost/urmom`
+1. Open the **Admin Dashboard** at `http://localhost/scraper`
 2. Go to the **Scrape** tab
 3. Fill in the details:
    - **VTU Result URL** — Paste the direct link to the VTU result page (e.g., `https://results.vtu.ac.in/D25J26Ecbcs/index.php`)
