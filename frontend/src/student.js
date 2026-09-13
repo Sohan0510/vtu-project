@@ -1,4 +1,6 @@
 import './student.css';
+import { getAuthSession, clearAuthSession, initGoogleSignIn, saveAuthSession, triggerGoogleAccountPicker } from './auth.js';
+import { AUTH_CONFIG, ALLOWED_EMAILS } from './auth.config.js';
 
 const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? ''
@@ -12,6 +14,7 @@ let isAdmin = false;
 let currentCalendarDate = new Date();
 let selectedCalendarDate = new Date();
 let calendarInitialLoad = true;
+let currentUserSession = null;
 
 // Calendar Filter States (Online, Offline, On-Campus & Off-Campus drives)
 const calendarFilters = {
@@ -124,6 +127,27 @@ function render() {
 function renderHome(container) {
   container.innerHTML = `
     <div class="lobby-container">
+      ${currentUserSession ? `
+        <div class="user-auth-bar">
+          <div class="user-profile-chip">
+            <div class="user-avatar-circle">
+              ${currentUserSession.picture 
+                ? `<img src="${escapeHTML(currentUserSession.picture)}" alt="${escapeHTML(currentUserSession.name)}" referrerpolicy="no-referrer">` 
+                : `${escapeHTML((currentUserSession.name || currentUserSession.email || 'U')[0].toUpperCase())}`}
+            </div>
+            <span class="user-chip-email" title="${escapeHTML(currentUserSession.email || '')}">${escapeHTML(currentUserSession.email || '')}</span>
+            <button class="btn-chip-logout" id="btn-user-logout" title="Sign out">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Toast Notification -->
       <div class="lobby-toast" id="lobby-toast">
         <div class="toast-content">
@@ -240,6 +264,16 @@ function renderHome(container) {
 
   // Trigger upcoming calendar event toast
   triggerUpcomingToast();
+
+  // Bind Google Session Logout
+  const logoutBtn = document.getElementById('btn-user-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      clearAuthSession();
+      currentUserSession = null;
+      renderLoginGate();
+    });
+  }
 }
 
 // 1.5 Render Registry Selection Page (for CSE, ISE, ECE selector)
@@ -2700,8 +2734,138 @@ function renderSPC(container) {
   }, 4000);
 }
 
-// Initial Boot — verify existing JWT token before rendering
+// Render Full-Screen Google Authentication Login Gate
+function renderLoginGate() {
+  const container = document.querySelector('#student-app');
+  container.className = 'view-login-gate';
+
+  const isPlaceholder = AUTH_CONFIG.clientId.includes('placeholder');
+  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+  container.innerHTML = `
+    <div class="login-gate-wrapper">
+      <div class="login-gate-card">
+        <div class="login-gate-crest">
+          <svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" stroke-width="1.8" fill="none">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+
+        <div class="login-gate-tag">
+          <span class="login-gate-tag-dot"></span>
+          RESTRICTED INSTITUTIONAL ACCESS
+        </div>
+
+        <h1 class="login-gate-title">Placement & Registry Portal</h1>
+        <div class="login-gate-subtitle">RV INSTITUTE OF TECHNOLOGY & MANAGEMENT</div>
+
+        <p class="login-gate-desc">
+          Sign in with your authorized institutional Google account to access student examination records, placement calendar, and the marks database.
+        </p>
+
+        <!-- Access Denied Alert (Shown when unauthorized email attempts login) -->
+        <div class="login-gate-error" id="login-gate-error" style="display: none;">
+          <div class="login-error-head">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span id="login-error-title">Access Denied</span>
+          </div>
+          <p class="login-error-msg" id="login-error-msg-body">
+            The account <span class="unauth-email-badge" id="unauth-email-target"></span> is not authorized to access this portal.
+          </p>
+          <button class="btn-retry-google" id="btn-switch-account" type="button">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M1 4v6h6M23 20v-6h-6"/>
+              <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+            </svg>
+            Choose a Different Account
+          </button>
+        </div>
+
+        <!-- Single Unified Sign in with Google Button -->
+        <div style="margin: 18px 0 24px 0; display: flex; justify-content: center;">
+          <button class="btn-choose-account" id="btn-google-single-signin" type="button" title="Sign in with your Google account">
+            <svg viewBox="0 0 24 24" width="20" height="20">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Sign in with Google</span>
+          </button>
+        </div>
+
+        <div class="login-gate-footer">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span>Secured Institutional Portal</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Bind single Google Sign-In button
+  const errorBox = document.getElementById('login-gate-error');
+  const errorTitle = document.getElementById('login-error-title');
+  const errorMsgBody = document.getElementById('login-error-msg-body');
+  const emailTarget = document.getElementById('unauth-email-target');
+  const switchBtn = document.getElementById('btn-switch-account');
+  const singleSignInBtn = document.getElementById('btn-google-single-signin');
+
+  const startGoogleSignIn = () => {
+    errorBox.style.display = 'none';
+
+    // Check if Client ID has been configured
+    if (AUTH_CONFIG.clientId.includes('YOUR_GOOGLE_CLIENT_ID') || AUTH_CONFIG.clientId.includes('placeholder')) {
+      errorTitle.textContent = 'Google Client ID Required';
+      errorMsgBody.innerHTML = 'Please add your Google OAuth Web Client ID into <code>frontend/src/auth.config.js</code> to connect with Google Cloud.';
+      errorBox.style.display = 'block';
+      return;
+    }
+
+    triggerGoogleAccountPicker(
+      (session) => {
+        currentUserSession = session;
+        boot();
+      },
+      (err, unauthEmail) => {
+        if (err?.message === 'UNAUTHORIZED_EMAIL' || unauthEmail) {
+          const displayEmail = unauthEmail || err?.email || 'this account';
+          errorTitle.textContent = 'Access Denied';
+          errorMsgBody.innerHTML = `The account <span class="unauth-email-badge">${escapeHTML(displayEmail)}</span> is not authorized to access this portal.`;
+          errorBox.style.display = 'block';
+        } else {
+          errorTitle.textContent = 'Google Authentication Notice';
+          errorMsgBody.textContent = err?.message || 'Could not complete Google Sign-In. Please try again.';
+          errorBox.style.display = 'block';
+        }
+      }
+    );
+  };
+
+  if (singleSignInBtn) {
+    singleSignInBtn.addEventListener('click', startGoogleSignIn);
+  }
+
+  if (switchBtn) {
+    switchBtn.addEventListener('click', startGoogleSignIn);
+  }
+}
+
+// Initial Boot — verify Google Auth session and existing JWT token before rendering
 async function boot() {
+  // Check Google Auth session (30-day validity + whitelist check)
+  currentUserSession = getAuthSession();
+  if (!currentUserSession) {
+    renderLoginGate();
+    return;
+  }
+
   await fetchEvents();
   const token = sessionStorage.getItem('adminToken');
   if (token) {
@@ -2730,3 +2894,4 @@ async function boot() {
 }
 
 boot();
+

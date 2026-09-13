@@ -2984,4 +2984,396 @@ tr:hover td {
   vertical-align: middle;
 }
 
+/* ── Google Auth Institutional Login Gate ── */
+.login-gate-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 20%, #ffffff 0%, var(--bg-parchment) 60%, var(--cream-dark) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-gate-wrapper::before {
+  content: '';
+  position: absolute;
+  top: -120px;
+  right: -120px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(197, 160, 89, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-gate-wrapper::after {
+  content: '';
+  position: absolute;
+  bottom: -150px;
+  left: -150px;
+  width: 450px;
+  height: 450px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(42, 27, 17, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-gate-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--cream-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 20px;
+  padding: 44px 36px;
+  box-shadow: 0 20px 40px -15px rgba(42, 27, 17, 0.15), 0 0 0 1px rgba(197, 160, 89, 0.2);
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  animation: gateCardFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gateCardFadeIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.login-gate-crest {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  background: linear-gradient(135deg, var(--wood-dark), var(--wood-medium));
+  color: var(--gold-satin);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px rgba(42, 27, 17, 0.2), inset 0 1px 1px rgba(229, 212, 179, 0.4);
+  border: 1px solid rgba(197, 160, 89, 0.4);
+}
+
+.login-gate-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: var(--wood-dark);
+  margin: 0 0 6px 0;
+  letter-spacing: 0.02em;
+}
+
+.login-gate-subtitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  margin: 0 0 18px 0;
+}
+
+.login-gate-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: #fdfaf3;
+  border: 1px solid var(--border-gold);
+  border-radius: 30px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--wood-medium);
+  letter-spacing: 0.05em;
+  margin-bottom: 20px;
+}
+
+.login-gate-tag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold-satin);
+  box-shadow: 0 0 6px var(--gold-satin);
+}
+
+.login-gate-desc {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0 0 28px 0;
+}
+
+.login-google-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 48px;
+  margin-bottom: 22px;
+}
+
+/* Access Denied Alert */
+.login-gate-error {
+  background: #fdf2f2;
+  border: 1px solid #f8b4b4;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  text-align: left;
+  animation: gateShake 0.4s ease;
+}
+
+@keyframes gateShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.login-error-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #9b1c1c;
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-bottom: 6px;
+}
+
+.login-error-msg {
+  font-size: 0.82rem;
+  color: #771d1d;
+  line-height: 1.45;
+  margin: 0 0 10px 0;
+}
+
+.unauth-email-badge {
+  font-family: monospace;
+  background: #fee2e2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.btn-retry-google {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9b1c1c;
+  background: #ffffff;
+  border: 1px solid #f8b4b4;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-retry-google:hover {
+  background: #fef2f2;
+  border-color: #f05252;
+}
+
+.login-gate-footer {
+  border-top: 1px solid var(--border-gold);
+  padding-top: 18px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* User Profile Chip in Header */
+.user-auth-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto 12px auto;
+  padding: 0 16px;
+}
+
+.user-profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--cream-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 30px;
+  padding: 4px 10px 4px 5px;
+  box-shadow: 0 2px 8px rgba(42, 27, 17, 0.06);
+  transition: all 0.2s;
+  max-width: 100%;
+}
+
+.user-avatar-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--wood-dark);
+  color: var(--gold-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  overflow: hidden;
+  border: 1px solid var(--gold-satin);
+  flex-shrink: 0;
+}
+
+.user-avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-chip-email {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--wood-dark);
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.btn-chip-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fdfaf3;
+  color: var(--wood-medium);
+  border: 1px solid var(--border-gold);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.btn-chip-logout:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+/* Mobile adjustments for user chip */
+@media (max-width: 640px) {
+  .user-auth-bar {
+    justify-content: center;
+    padding: 0 10px;
+    margin-bottom: 10px;
+  }
+  
+  .user-profile-chip {
+    gap: 8px;
+    padding: 3px 8px 3px 4px;
+    max-width: 95vw;
+  }
+
+  .user-chip-email {
+    font-size: 0.72rem;
+    max-width: 160px;
+  }
+
+  .btn-chip-logout {
+    padding: 3px 8px;
+    font-size: 0.68rem;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 380px) {
+  .user-chip-email {
+    max-width: 120px;
+  }
+}
+
+/* Dev Test Box for Quick Testing */
+.dev-auth-testbox {
+  margin-top: 18px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.dev-auth-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.dev-auth-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-dev-test {
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.btn-dev-allowed {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+.btn-dev-allowed:hover {
+  background: #dcfce7;
+}
+
+.btn-dev-unauthorized {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+.btn-dev-unauthorized:hover {
+  background: #fee2e2;
+}
+
+.btn-choose-account {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  border-radius: 24px;
+  padding: 10px 24px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto 12px auto;
+}
+
+.btn-choose-account:hover {
+  background: #f8fafd;
+  border-color: #c2e7ff;
+  box-shadow: 0 2px 6px rgba(60, 64, 67, 0.15);
+}
+
+
+
 

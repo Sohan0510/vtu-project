@@ -1,4 +1,11 @@
 import './style.css';
+import { getAuthSession, clearAuthSession } from './auth.js';
+
+// Enforce Google Auth Session
+const currentSession = getAuthSession();
+if (!currentSession) {
+  window.location.href = '/';
+}
 
 // Automatically detect local vs deployed environments
 const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -72,6 +79,17 @@ document.querySelector('#app').innerHTML = `
         <span class="stat-dot"></span>
         <span id="stat-count">0</span> Students
       </div>
+
+      ${currentSession ? `
+        <div style="display: flex; align-items: center; gap: 8px; margin-left: 12px;">
+          <span style="font-size: 0.75rem; color: var(--text-secondary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${currentSession.email}">
+            ${currentSession.email}
+          </span>
+          <button id="btn-scraper-logout" style="background: none; border: 1px solid var(--border, #333); color: var(--text-secondary, #aaa); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">
+            Sign Out
+          </button>
+        </div>
+      ` : ''}
     </div>
   </header>
 
@@ -1329,3 +1347,12 @@ async function updateStatCount() {
 
 // ── Init ──
 updateStatCount();
+
+const scraperLogoutBtn = document.getElementById('btn-scraper-logout');
+if (scraperLogoutBtn) {
+  scraperLogoutBtn.addEventListener('click', () => {
+    clearAuthSession();
+    window.location.href = '/';
+  });
+}
+
