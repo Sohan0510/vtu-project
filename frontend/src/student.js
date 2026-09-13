@@ -2906,7 +2906,14 @@ async function boot() {
     return;
   }
 
-  await fetchEvents();
+  // Render UI immediately so user doesn't wait on a blank screen
+  render();
+
+  // Fetch calendar events in the background
+  fetchEvents().then(() => {
+    if (currentView === 'calendar') render();
+  });
+
   const token = sessionStorage.getItem('adminToken');
   if (token) {
     try {
@@ -2929,8 +2936,9 @@ async function boot() {
         isAdmin = false;
       }
     }
+    // Re-render once admin check finishes to show admin controls
+    render();
   }
-  render();
 }
 
 boot();
