@@ -134,6 +134,14 @@ body {
   width: 100%;
 }
 
+#student-app.view-login-gate {
+  max-width: 100vw;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  min-height: 100vh;
+}
+
 /* Serif Headings */
 h1, h2, h3, .mini-month-title {
   font-family: 'Cormorant Garamond', Georgia, serif;
@@ -2986,52 +2994,65 @@ tr:hover td {
 
 /* ── Google Auth Institutional Login Gate ── */
 .login-gate-wrapper {
+  width: 100vw;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background: radial-gradient(circle at 50% 20%, #ffffff 0%, var(--bg-parchment) 60%, var(--cream-dark) 100%);
+  padding: 40px 24px;
+  background: radial-gradient(circle at 50% 25%, #ffffff 0%, var(--bg-parchment) 60%, var(--cream-dark) 100%);
   position: relative;
   overflow: hidden;
 }
 
-.login-gate-wrapper::before {
-  content: '';
+/* Ambient glow orbs on desktop */
+.login-ambient-orb {
   position: absolute;
-  top: -120px;
-  right: -120px;
-  width: 380px;
-  height: 380px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(197, 160, 89, 0.15) 0%, transparent 70%);
   pointer-events: none;
+  filter: blur(70px);
 }
 
-.login-gate-wrapper::after {
-  content: '';
-  position: absolute;
-  bottom: -150px;
-  left: -150px;
-  width: 450px;
-  height: 450px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(42, 27, 17, 0.08) 0%, transparent 70%);
-  pointer-events: none;
+.login-orb-1 {
+  width: 520px;
+  height: 520px;
+  top: 5%;
+  right: 12%;
+  background: radial-gradient(circle, rgba(197, 160, 89, 0.18) 0%, transparent 70%);
+  animation: orbFloat1 8s ease-in-out infinite alternate;
+}
+
+.login-orb-2 {
+  width: 560px;
+  height: 560px;
+  bottom: 5%;
+  left: 10%;
+  background: radial-gradient(circle, rgba(42, 27, 17, 0.07) 0%, transparent 70%);
+  animation: orbFloat2 10s ease-in-out infinite alternate;
+}
+
+@keyframes orbFloat1 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-20px, 25px); }
+}
+
+@keyframes orbFloat2 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(25px, -20px); }
 }
 
 .login-gate-card {
   width: 100%;
-  max-width: 480px;
-  background: var(--cream-card);
+  max-width: 520px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--cream-card) 100%);
   border: 1px solid var(--border-gold);
-  border-radius: 20px;
-  padding: 44px 36px;
-  box-shadow: 0 20px 40px -15px rgba(42, 27, 17, 0.15), 0 0 0 1px rgba(197, 160, 89, 0.2);
+  border-radius: 24px;
+  padding: 50px 44px;
+  box-shadow: 0 24px 64px -14px rgba(42, 27, 17, 0.13), 0 0 0 1px rgba(255, 255, 255, 0.85) inset, 0 4px 20px rgba(197, 160, 89, 0.08);
   text-align: center;
   position: relative;
   z-index: 2;
-  animation: gateCardFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: gateCardFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes gateCardFadeIn {
@@ -3348,6 +3369,16 @@ tr:hover td {
   background: #fee2e2;
 }
 
+/* OAuth Section & Single Button Styling */
+.login-oauth-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 22px 0 24px 0;
+  width: 100%;
+}
+
 .btn-choose-account {
   display: inline-flex;
   align-items: center;
@@ -3355,23 +3386,56 @@ tr:hover td {
   gap: 12px;
   background: #ffffff;
   color: #3c4043;
-  border: 1px solid #dadce0;
-  border-radius: 24px;
-  padding: 10px 24px;
-  font-size: 0.9rem;
+  border: 1.5px solid #dadce0;
+  border-radius: 28px;
+  padding: 13px 30px;
+  font-size: 0.96rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.06);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
-  max-width: 280px;
-  margin: 0 auto 12px auto;
+  max-width: 330px;
+  position: relative;
+  letter-spacing: 0.01em;
 }
 
 .btn-choose-account:hover {
-  background: #f8fafd;
-  border-color: #c2e7ff;
-  box-shadow: 0 2px 6px rgba(60, 64, 67, 0.15);
+  background: #ffffff;
+  border-color: #4285F4;
+  color: #1a73e8;
+  box-shadow: 0 4px 14px rgba(66, 133, 244, 0.18), 0 1px 3px rgba(60, 64, 67, 0.08);
+  transform: translateY(-1.5px);
+}
+
+.btn-choose-account:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.15);
+}
+
+.login-hint-domain {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 14px;
+  padding: 5px 14px;
+  background: rgba(197, 160, 89, 0.08);
+  border: 1px solid rgba(197, 160, 89, 0.22);
+  border-radius: 20px;
+}
+
+.login-hint-domain .hint-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--gold-dark);
+}
+
+.login-hint-domain strong {
+  color: var(--wood-dark);
+  font-weight: 600;
 }
 
 /* Authentic Google 4-Color Circular Loader Spinner */
@@ -3401,6 +3465,29 @@ tr:hover td {
   cursor: wait !important;
   pointer-events: none;
   box-shadow: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .login-ambient-orb {
+    display: none;
+  }
+
+  .login-gate-card {
+    padding: 36px 22px;
+    max-width: 92vw;
+    border-radius: 20px;
+  }
+
+  .login-gate-title {
+    font-size: 1.65rem;
+  }
+
+  .btn-choose-account {
+    max-width: 100%;
+    padding: 12px 20px;
+    font-size: 0.9rem;
+  }
 }
 
 
