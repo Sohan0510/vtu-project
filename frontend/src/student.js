@@ -2752,7 +2752,6 @@ function renderLoginGate() {
         </div>
 
         <div class="login-gate-tag">
-          <span class="login-gate-tag-dot"></span>
           RESTRICTED INSTITUTIONAL ACCESS
         </div>
 
