@@ -2804,14 +2804,6 @@ function renderLoginGate() {
             <span>Authorized for <strong>@rvei.edu.in</strong> accounts</span>
           </div>
         </div>
-
-        <div class="login-gate-footer">
-          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <span>Secured Institutional Portal</span>
-        </div>
       </div>
     </div>
   `;
