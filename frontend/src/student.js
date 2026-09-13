@@ -2801,7 +2801,6 @@ function renderLoginGate() {
           </button>
 
           <div class="login-hint-domain">
-            <span class="hint-dot"></span>
             <span>Authorized for <strong>@rvei.edu.in</strong> accounts</span>
           </div>
         </div>
