@@ -92,6 +92,27 @@ docker-compose up -d --build
 | **API Docs (Swagger)**    | [http://localhost:8000/docs](http://localhost:8000/docs) |
 | **MongoDB** (for Compass) | `mongodb://localhost:27017/`                             |
 
+### 4. Google OAuth & Authentication Setup
+
+The client ID is configured for local access (`http://localhost`) in `frontend/src/auth.config.js`.
+
+- **Institutional Domain Access:** Only authenticated Google accounts ending in `@rvei.edu.in` (including `.rvitm@rvei.edu.in`) and whitelisted email IDs can access the portal. Personal accounts are blocked.
+- **Google Account Chooser:** Single-click sign-in with Google's native account chooser pop-up, account switching, and real-time status loading spinner.
+- **Session Expiry (30 Days):** Verified user sessions persist in `localStorage` for **30 days** without requiring re-login, even across browser restarts. Users can log out anytime using the header **Sign Out** button.
+
+> [!IMPORTANT]
+> **Authentication Error / `Error 400: origin_mismatch`?**
+> If you experience an authorization error while signing in with Google, you need to register your URL in Google Cloud Console:
+> 1. Navigate to the [Google Cloud Console Credentials Page](https://console.cloud.google.com/apis/credentials).
+> 2. Select and edit your **OAuth 2.0 Web Client ID**.
+> 3. Under **Authorized JavaScript origins**, click **+ ADD URI** and add your exact URL (do not include trailing slashes):
+>    - `http://localhost`
+>    - `http://localhost:80`
+>    - `http://localhost:5173` *(if running Vite directly)*
+>    - `http://127.0.0.1`
+>    - `https://your-domain.vercel.app` *(for production deployments)*
+> 4. Click **Save** and wait ~1–2 minutes for Google's servers to propagate the change.
+
 ---
 
 ## 📖 Usage Guide

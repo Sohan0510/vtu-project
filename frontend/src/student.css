@@ -3374,6 +3374,35 @@ tr:hover td {
   box-shadow: 0 2px 6px rgba(60, 64, 67, 0.15);
 }
 
+/* Authentic Google 4-Color Circular Loader Spinner */
+.google-loader-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid #f1f3f4;
+  border-top-color: #4285F4;
+  border-right-color: #34A853;
+  border-bottom-color: #FBBC05;
+  border-left-color: #EA4335;
+  border-radius: 50%;
+  animation: googleSpin 0.85s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+@keyframes googleSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.btn-choose-account.is-loading {
+  background: #f8fafd !important;
+  border-color: #d2e3fc !important;
+  color: #3c4043 !important;
+  cursor: wait !important;
+  pointer-events: none;
+  box-shadow: none !important;
+}
+
 
 
 

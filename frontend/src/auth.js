@@ -200,7 +200,7 @@ let tokenClient = null;
  * Triggers Google's native OAuth 2.0 Account Chooser popup with prompt: 'select_account'
  * This explicitly presents the user with the list of their Google accounts and "+ Use another account"
  */
-export function triggerGoogleAccountPicker(onAuthSuccess, onAuthError) {
+export function triggerGoogleAccountPicker(onAuthSuccess, onAuthError, onProgress) {
   if (!window.google?.accounts?.oauth2) {
     onAuthError?.(new Error('Google OAuth client library is still loading. Please try again.'));
     return;
@@ -216,9 +216,13 @@ export function triggerGoogleAccountPicker(onAuthSuccess, onAuthError) {
           if (tokenResponse.error) {
             if (tokenResponse.error !== 'popup_closed_by_user') {
               onAuthError?.(new Error(tokenResponse.error_description || tokenResponse.error));
+            } else {
+              onAuthError?.(new Error('POPUP_CLOSED'));
             }
             return;
           }
+
+          onProgress?.('Verifying account with Google...');
 
           try {
             // Fetch verified user profile directly from Google
