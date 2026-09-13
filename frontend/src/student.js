@@ -87,6 +87,7 @@ async function sha256(message) {
 
 // Placement Calendar Database array
 let calendarEvents = [];
+let eventsFetched = false;
 
 // Fetch events from secure backend
 async function fetchEvents() {
@@ -101,6 +102,7 @@ async function fetchEvents() {
     console.error('Failed to fetch events:', err);
     calendarEvents = [];
   }
+  eventsFetched = true;
 }
 
 // Router Entry
@@ -357,7 +359,7 @@ function renderRegistrySelector(container) {
 // Helper to find and render upcoming event notification toast
 function triggerUpcomingToast() {
   const toast = document.getElementById('lobby-toast');
-  if (!toast) return;
+  if (!toast || !eventsFetched) return;
 
   const today = new Date();
   const y = today.getFullYear();
@@ -2912,6 +2914,7 @@ async function boot() {
   // Fetch calendar events in the background
   fetchEvents().then(() => {
     if (currentView === 'calendar') render();
+    else if (currentView === 'home') triggerUpcomingToast();
   });
 
   const token = sessionStorage.getItem('adminToken');
