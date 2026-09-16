@@ -22,11 +22,11 @@ A full-stack tool to **automatically scrape, store, and export** student exam re
 ## 🏗️ Architecture
 
 ```
-┌──────────────────┐       ┌──────────────────────┐       ┌──────────────┐
-│   Frontend       │       │   Backend (FastAPI)   │       │   MongoDB    │
-│   (Vite + JS)    │──────▶│   Port 8000           │──────▶│   Port 27017 │
-│   Port 80        │  API  │                       │       │              │
-│   Nginx reverse  │       │ ┌──────────────────┐  │       └──────────────┘
+┌──────────────────┐       ┌──────────────────────┐         ┌──────────────┐
+│   Frontend       │       │   Backend (FastAPI)   │        │   MongoDB    │
+│   (Vite + JS)    │──────▶│   Port 8000           │──────▶│   Atlas      │
+│   Port 80        │  API  │                       │        │              │
+│   Nginx reverse  │       │ ┌──────────────────┐  │        └──────────────┘
 │   proxy → :8000  │       │ │ Scraper Engine   │  │
 └──────────────────┘       │ │  ├─ captcha.py   │  │
                            │ │  ├─ scraper.py   │  │
@@ -103,14 +103,15 @@ The client ID is configured for local access (`http://localhost`) in `frontend/s
 > [!IMPORTANT]
 > **Authentication Error / `Error 400: origin_mismatch`?**
 > If you experience an authorization error while signing in with Google, you need to register your URL in Google Cloud Console:
+>
 > 1. Navigate to the [Google Cloud Console Credentials Page](https://console.cloud.google.com/apis/credentials).
 > 2. Select and edit your **OAuth 2.0 Web Client ID**.
 > 3. Under **Authorized JavaScript origins**, click **+ ADD URI** and add your exact URL (do not include trailing slashes):
 >    - `http://localhost`
 >    - `http://localhost:80`
->    - `http://localhost:5173` *(if running Vite directly)*
+>    - `http://localhost:5173` _(if running Vite directly)_
 >    - `http://127.0.0.1`
->    - `https://your-domain.vercel.app` *(for production deployments)*
+>    - `https://your-domain.vercel.app` _(for production deployments)_
 > 4. Click **Save** and wait ~1–2 minutes for Google's servers to propagate the change.
 
 ---
