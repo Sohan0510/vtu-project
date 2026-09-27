@@ -368,7 +368,7 @@ function triggerUpcomingToast() {
   const todayStr = `${y}-${m}-${d}`;
 
   const upcoming = calendarEvents
-    .filter(ev => ev.date >= todayStr)
+    .filter(ev => ev.date && ev.date.trim().toUpperCase() !== 'TBD' && ev.date >= todayStr)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const msgText = document.getElementById('toast-message-text');
@@ -652,20 +652,9 @@ function renderCalendar(container) {
       <div class="calendar-workspace">
         <!-- Left Sidebar -->
         <aside class="calendar-sidebar">
-          <div class="mini-calendar">
-            <div class="mini-month-header">
-              <span class="mini-month-title"></span>
-            </div>
-            <div class="mini-grid">
-              <div class="mini-day-name">S</div>
-              <div class="mini-day-name">M</div>
-              <div class="mini-day-name">T</div>
-              <div class="mini-day-name">W</div>
-              <div class="mini-day-name">T</div>
-              <div class="mini-day-name">F</div>
-              <div class="mini-day-name">S</div>
-              <!-- Mini calendar days populated dynamically -->
-            </div>
+          <!-- TBD Upcoming Drives Pipeline -->
+          <div class="calendar-tbd-section" id="calendar-tbd-section">
+            <!-- Populated dynamically by renderTbdDrives() -->
           </div>
 
           <div class="calendar-filters">
@@ -714,13 +703,21 @@ function renderCalendar(container) {
             <div class="toolbar-left">
               <button class="toolbar-btn today-btn" id="cal-today-btn">Today</button>
               <div class="toolbar-nav">
-                <button class="toolbar-nav-btn" id="cal-prev-btn">&lt;</button>
+                <button class="toolbar-nav-btn" id="cal-prev-btn" title="Previous month" aria-label="Previous month">
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none">
+                    <polyline points="15 18 9 12 15 6"/>
+                  </svg>
+                </button>
                 <span class="toolbar-current-month"></span>
-                <button class="toolbar-nav-btn" id="cal-next-btn">&gt;</button>
+                <button class="toolbar-nav-btn" id="cal-next-btn" title="Next month" aria-label="Next month">
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
               </div>
             </div>
-            <div class="toolbar-subscribe" style="display: flex; justify-content: flex-end; width: 100%;">
-              <button onclick="showSubscribeModal()" class="toolbar-btn" style="background: #4285F4; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; font-size: 0.85rem; border-radius: 6px;">
+            <div class="toolbar-subscribe">
+              <button onclick="showSubscribeModal()" class="toolbar-btn btn-subscribe-cal" style="background: #4285F4; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 10H21" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H12.01" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Subscribe
               </button>
@@ -759,24 +756,21 @@ function renderCalendar(container) {
   `;
 
   // Generate layouts
-  generateMiniCalendar();
   generateCalendarGrid();
+  renderTbdDrives();
 
   // Calendar navigation
   document.getElementById('cal-prev-btn')?.addEventListener('click', () => {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
-    generateMiniCalendar();
     generateCalendarGrid();
   });
   document.getElementById('cal-next-btn')?.addEventListener('click', () => {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
-    generateMiniCalendar();
     generateCalendarGrid();
   });
   document.getElementById('cal-today-btn')?.addEventListener('click', () => {
     currentCalendarDate = new Date();
     calendarInitialLoad = true;
-    generateMiniCalendar();
     generateCalendarGrid();
   });
 
@@ -807,6 +801,7 @@ function renderCalendar(container) {
       calendarFilters[key] = e.target.checked;
       generateCalendarGrid();
       renderAgendaList();
+      renderTbdDrives();
     });
   });
 
@@ -832,59 +827,262 @@ function getMonthData(year, month) {
   return { firstDay, daysInMonth, daysInPrevMonth };
 }
 
-// 4. Generate Sidebar Mini Calendar
-function generateMiniCalendar() {
-  const miniGrid = document.querySelector('.mini-grid');
-  if (!miniGrid) return;
-  // Keep only headers
-  const headers = Array.from(miniGrid.children).slice(0, 7);
-  miniGrid.innerHTML = '';
-  headers.forEach(h => miniGrid.appendChild(h));
+// Mini calendar no-op helper for backward compatibility
+function generateMiniCalendar() {}
 
-  const year = currentCalendarDate.getFullYear();
-  const month = currentCalendarDate.getMonth();
-  
-  const title = document.querySelector('.mini-month-title');
-  if (title) {
-    title.textContent = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+// 4. Render TBD Upcoming Placement Drives Pipeline
+function renderTbdDrives() {
+  const tbdContainer = document.getElementById('calendar-tbd-section');
+  if (!tbdContainer) return;
+
+  const tbdEvents = calendarEvents.filter(ev => {
+    const isTbd = ev.date && ev.date.trim().toUpperCase() === 'TBD';
+    if (!isTbd) return false;
+    if (!calendarFilters[ev.type]) return false;
+    if (ev.mode === 'online' && !calendarFilters.online) return false;
+    if (ev.mode === 'offline' && !calendarFilters.offline) return false;
+    
+    const isRVCE = ev.location === 'rvce' || ev.location === 'offcampus';
+    const isRVITM = ev.location === 'rvitm' || ev.location === 'oncampus';
+    const isWorksite = ev.location === 'worksite';
+
+    if (isRVCE && !calendarFilters.oncampus) return false;
+    if (isRVITM && !calendarFilters.offcampus) return false;
+    if (isWorksite && !calendarFilters.worksite) return false;
+    return true;
+  });
+
+  let html = `
+    <div class="tbd-section-header">
+      <div class="tbd-header-title-row">
+        <h3>Upcoming Drives</h3>
+        <span class="tbd-count-pill">${tbdEvents.length} TBD</span>
+      </div>
+      ${isAdmin ? `
+        <button class="tbd-add-btn" id="btn-add-tbd" title="Add company drive with unconfirmed date">
+          <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Add</span>
+        </button>
+      ` : ''}
+    </div>
+    <div class="tbd-items-list">
+  `;
+
+  if (tbdEvents.length === 0) {
+    html += `
+      <div class="tbd-empty-state">
+        <div class="tbd-empty-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="1.6" fill="none">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <span class="tbd-empty-text">No unconfirmed drives pending.</span>
+        ${isAdmin ? `
+          <button type="button" class="tbd-empty-add-btn" id="btn-add-tbd-empty">
+            + Add First TBD Drive
+          </button>
+        ` : ''}
+      </div>
+    `;
+  } else {
+    tbdEvents.forEach(ev => {
+      const modeTag = ev.mode ? `<span class="tbd-mode-tag mode-${ev.mode}">${ev.mode.toUpperCase()}</span>` : '';
+      const locationLabel = (ev.location === 'rvitm' || ev.location === 'oncampus') ? 'RVITM' : (ev.location === 'rvce' || ev.location === 'offcampus') ? 'RVCE' : ev.location === 'worksite' ? 'WORKSITE' : '';
+      const locationClass = (ev.location === 'rvitm' || ev.location === 'oncampus') ? 'oncampus' : (ev.location === 'rvce' || ev.location === 'offcampus') ? 'offcampus' : 'worksite';
+      const locationTag = ev.location ? `<span class="tbd-mode-tag mode-${locationClass}">${locationLabel}</span>` : '';
+      const studentTypeClass = ev.studentType ? ev.studentType.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '';
+      const studentTypeTag = ev.studentType ? `<span class="tbd-mode-tag mode-studenttype-${studentTypeClass}">${ev.studentType.toUpperCase()}</span>` : '';
+      
+      let subtypesTags = '';
+      if (ev.subtypes && Array.isArray(ev.subtypes)) {
+        ev.subtypes.slice(0, 2).forEach(sub => {
+          subtypesTags += `<span class="tbd-subtype-tag">${sub.toUpperCase()}</span>`;
+        });
+      }
+
+      // Extract first clean line of description/criteria for preview
+      let descSnippet = '';
+      if (ev.desc) {
+        const firstLine = ev.desc.split(/\r?\n/).find(l => l.trim().length > 0) || '';
+        descSnippet = firstLine.replace(/[*#_•\-]/g, '').trim();
+      }
+
+      html += `
+        <div class="tbd-card" data-event-id="${ev.id}">
+          <div class="tbd-card-top">
+            <span class="tbd-pill-badge">TBD</span>
+            <div class="tbd-card-tags">
+              ${studentTypeTag}
+              ${modeTag}
+              ${locationTag}
+              ${subtypesTags}
+            </div>
+          </div>
+          <div class="tbd-card-title">${escapeHTML(ev.title)}</div>
+          ${descSnippet ? `<div class="tbd-card-snippet" title="${escapeHTML(descSnippet)}">${escapeHTML(descSnippet)}</div>` : ''}
+          ${isAdmin ? `
+            <div class="tbd-card-actions">
+              <button class="tbd-action-btn schedule" data-action="schedule" title="Assign a date to schedule this drive">
+                <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <span>Set Date</span>
+              </button>
+              <button class="tbd-action-btn edit" data-action="edit" title="Edit drive criteria">Edit</button>
+              <button class="tbd-action-btn delete" data-action="delete" title="Delete drive">Delete</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    });
   }
 
-  const { firstDay, daysInMonth, daysInPrevMonth } = getMonthData(year, month);
-  const today = new Date();
-  
-  // Previous month filler days
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const el = document.createElement('div');
-    el.className = 'mini-day-cell prev-month';
-    el.textContent = daysInPrevMonth - i;
-    miniGrid.appendChild(el);
+  html += `</div>`;
+  tbdContainer.innerHTML = html;
+
+  // Add click listener to add button
+  if (isAdmin) {
+    document.getElementById('btn-add-tbd')?.addEventListener('click', () => {
+      showCreateEventModal('TBD');
+    });
+    document.getElementById('btn-add-tbd-empty')?.addEventListener('click', () => {
+      showCreateEventModal('TBD');
+    });
   }
 
-  // Current month days
-  for (let d = 1; d <= daysInMonth; d++) {
-    const el = document.createElement('div');
-    el.className = 'mini-day-cell';
-    if (d === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
-      el.classList.add('today');
+  // Add click listeners to cards
+  tbdContainer.querySelectorAll('.tbd-card').forEach(card => {
+    const eventId = parseInt(card.getAttribute('data-event-id'));
+    const ev = calendarEvents.find(e => e.id === eventId);
+    if (!ev) return;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.tbd-card-actions')) return;
+      if (isAdmin) {
+        showEventDetailModalAdmin(ev);
+      } else {
+        showEventDetailModalVisitor(ev);
+      }
+    });
+
+    if (isAdmin) {
+      card.querySelector('.tbd-action-btn.schedule')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showScheduleDateModal(ev);
+      });
+
+      card.querySelector('.tbd-action-btn.edit')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showEditEventModal(ev);
+      });
+
+      card.querySelector('.tbd-action-btn.delete')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (confirm(`Are you sure you want to delete the TBD drive for "${ev.title}"?`)) {
+          const btn = e.target;
+          btn.disabled = true;
+          btn.textContent = '...';
+          const token = sessionStorage.getItem('adminToken');
+          
+          try {
+            const res = await fetch(`${API}/api/events`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ id: ev.id })
+            });
+            
+            if (!res.ok) throw new Error('Delete failed');
+            
+            await fetchEvents();
+            generateCalendarGrid();
+            renderTbdDrives();
+            renderAgendaList();
+          } catch (err) {
+            alert('Failed to delete event. Please check your connection.');
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+          }
+        }
+      });
     }
-    
-    // Highlight days with events
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const hasEvents = calendarEvents.some(ev => ev.date === dateStr);
-    if (hasEvents) el.classList.add('has-event');
-    
-    el.textContent = d;
-    miniGrid.appendChild(el);
-  }
+  });
+}
 
-  // Next month filler days
-  const remainingCells = 42 - (firstDay + daysInMonth); // standard 6 rows
-  for (let d = 1; d <= remainingCells; d++) {
-    const el = document.createElement('div');
-    el.className = 'mini-day-cell next-month';
-    el.textContent = d;
-    miniGrid.appendChild(el);
-  }
+// 4.6. Modal to confirm date for TBD event (Promote to live calendar)
+function showScheduleDateModal(event) {
+  const modal = document.getElementById('event-modal');
+  const card = document.getElementById('modal-card-content');
+  if (!modal || !card) return;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  
+  card.innerHTML = `
+    <div class="modal-header">
+      <h3 style="font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.5rem; font-weight: 700; color: var(--wood-dark); display: flex; align-items: center; gap: 8px;">
+        📅 Schedule Date for ${escapeHTML(event.title)}
+      </h3>
+      <button class="modal-close" onclick="hideEventModal()">&times;</button>
+    </div>
+    <form id="schedule-date-form" class="modal-form" style="padding: 20px;">
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0 0 16px 0; line-height: 1.4;">
+        Assign a confirmed date for <strong>${escapeHTML(event.title)}</strong> to move it from the TBD pipeline to the live placement calendar.
+      </p>
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label for="schedule-confirmed-date" style="font-weight: 600; margin-bottom: 6px; display: block; font-size: 0.85rem; color: var(--text-secondary);">Confirmed Drive Date</label>
+        <input type="date" id="schedule-confirmed-date" value="${todayStr}" required style="width: 100%; padding: 10px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.9rem; font-family: 'Inter', sans-serif; background: white;">
+      </div>
+      <div id="schedule-error" class="login-error-msg" style="margin-bottom: 15px;"></div>
+      <div class="form-submit-group" style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button type="button" class="form-cancel-btn" onclick="hideEventModal()">Cancel</button>
+        <button type="submit" class="form-submit-btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 700;">
+          Confirm Date & Schedule
+        </button>
+      </div>
+    </form>
+  `;
+  modal.classList.add('active');
+
+  document.getElementById('schedule-date-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newDate = document.getElementById('schedule-confirmed-date').value;
+    const submitBtn = e.target.querySelector('.form-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Scheduling...';
+    const token = sessionStorage.getItem('adminToken');
+    
+    try {
+      const res = await fetch(`${API}/api/events`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          ...event,
+          date: newDate
+        })
+      });
+      if (!res.ok) {
+        let errData = {};
+        try { errData = await res.json(); } catch(e) {}
+        throw new Error(errData.detail || 'Failed to update event date.');
+      }
+      
+      await fetchEvents();
+      hideEventModal();
+      generateCalendarGrid();
+      renderTbdDrives();
+      renderAgendaList();
+    } catch (err) {
+      alert(err.message || 'Failed to schedule event.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Confirm Date & Schedule';
+    }
+  });
 }
 
 // 5. Generate Main Calendar Grid
@@ -1192,7 +1390,6 @@ function renderAgendaList() {
             
             await fetchEvents();
             generateCalendarGrid();
-            generateMiniCalendar();
             renderAgendaList();
           } catch (err) {
             alert('Failed to delete event. Please check your connection.');
@@ -1256,10 +1453,16 @@ function showEventDetailModalVisitor(event) {
   const modal = document.getElementById('event-modal');
   const card = document.getElementById('modal-card-content');
   
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  const parts = event.date.split('-');
-  const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
-  const dateStr = dateObj.toLocaleDateString('en-US', options);
+  const isTbd = !event.date || event.date.trim().toUpperCase() === 'TBD';
+  let dateStr = '';
+  if (isTbd) {
+    dateStr = `<span class="modal-tbd-tag" style="display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem;">⏳ Date: To Be Decided (TBD)</span>`;
+  } else {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const parts = event.date.split('-');
+    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    dateStr = dateObj.toLocaleDateString('en-US', options);
+  }
   
   const modeBadge = event.mode ? `<span class="modal-mode-badge mode-${event.mode}">${event.mode.toUpperCase()}</span>` : '';
   const locationLabel = (event.location === 'rvitm' || event.location === 'oncampus') ? 'RVITM' : (event.location === 'rvce' || event.location === 'offcampus') ? 'RVCE' : event.location === 'worksite' ? 'WORKSITE' : '';
@@ -1292,15 +1495,21 @@ function showEventDetailModalVisitor(event) {
   modal.classList.add('active');
 }
 
-// Admin Details View (with Edit/Delete toggles)
+// Admin Details View (with Edit/Delete toggles and Set Date action)
 function showEventDetailModalAdmin(event) {
   const modal = document.getElementById('event-modal');
   const card = document.getElementById('modal-card-content');
   
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  const parts = event.date.split('-');
-  const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
-  const dateStr = dateObj.toLocaleDateString('en-US', options);
+  const isTbd = !event.date || event.date.trim().toUpperCase() === 'TBD';
+  let dateStr = '';
+  if (isTbd) {
+    dateStr = `<span class="modal-tbd-tag" style="display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem;">⏳ Date: To Be Decided (TBD)</span>`;
+  } else {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const parts = event.date.split('-');
+    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    dateStr = dateObj.toLocaleDateString('en-US', options);
+  }
   
   const modeBadge = event.mode ? `<span class="modal-mode-badge mode-${event.mode}">${event.mode.toUpperCase()}</span>` : '';
   const locationLabel2 = (event.location === 'rvitm' || event.location === 'oncampus') ? 'RVITM' : (event.location === 'rvce' || event.location === 'offcampus') ? 'RVCE' : event.location === 'worksite' ? 'WORKSITE' : '';
@@ -1329,13 +1538,21 @@ function showEventDetailModalAdmin(event) {
     <h3 class="modal-title">${escapeHTML(event.title)}</h3>
     <div class="modal-date">${dateStr}</div>
     <div class="modal-desc">${formatEventDescription(event.desc)}</div>
-    <div class="modal-actions">
+    <div class="modal-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+      ${isTbd ? `<button class="modal-btn schedule-btn" id="modal-schedule-btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 600;">📅 Confirm Date</button>` : ''}
       <button class="modal-btn edit-btn" id="modal-edit-btn">Edit Update</button>
       <button class="modal-btn delete-btn" id="modal-delete-btn">Delete Update</button>
     </div>
   `;
   modal.classList.add('active');
   
+  // Set Date click
+  if (isTbd) {
+    document.getElementById('modal-schedule-btn')?.addEventListener('click', () => {
+      showScheduleDateModal(event);
+    });
+  }
+
   // Edit click
   document.getElementById('modal-edit-btn').addEventListener('click', () => {
     showEditEventModal(event);
@@ -1361,7 +1578,7 @@ function showEventDetailModalAdmin(event) {
         await fetchEvents();
         hideEventModal();
         generateCalendarGrid();
-        generateMiniCalendar();
+        renderTbdDrives();
         renderAgendaList();
       } catch (err) {
         alert('Failed to delete event. Please check your connection.');
@@ -1376,6 +1593,7 @@ function showEventDetailModalAdmin(event) {
 function showEditEventModal(event) {
   const modal = document.getElementById('event-modal');
   const card = document.getElementById('modal-card-content');
+  const isTbd = !event.date || event.date.trim().toUpperCase() === 'TBD';
   
   card.innerHTML = `
     <div class="modal-header">
@@ -1430,8 +1648,14 @@ function showEditEventModal(event) {
         <input type="hidden" id="form-subtypes" value="">
       </div>
       <div class="form-group">
-        <label for="form-date">Scheduled Date</label>
-        <input type="date" id="form-date" value="${event.date}" required>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label for="form-date" style="margin: 0; font-weight: 600;">Scheduled Date</label>
+          <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #b45309; font-weight: 600;">
+            <input type="checkbox" id="form-is-tbd" ${isTbd ? 'checked' : ''}>
+            <span>Date is TBD (Unconfirmed)</span>
+          </label>
+        </div>
+        <input type="date" id="form-date" value="${isTbd ? '' : event.date}" ${isTbd ? 'disabled' : ''} style="background: ${isTbd ? '#f3f4f6' : 'white'};">
       </div>
       <div class="form-group">
         <label for="form-desc">Details / Description</label>
@@ -1446,6 +1670,19 @@ function showEditEventModal(event) {
   
   if (modal) modal.classList.add('active');
   
+  // TBD checkbox logic
+  const isTbdCheckbox = document.getElementById('form-is-tbd');
+  const dateInput = document.getElementById('form-date');
+  if (isTbdCheckbox && dateInput) {
+    isTbdCheckbox.addEventListener('change', (e) => {
+      dateInput.disabled = e.target.checked;
+      dateInput.style.background = e.target.checked ? '#f3f4f6' : 'white';
+      if (!e.target.checked && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+      }
+    });
+  }
+
   // Format buttons logic
   const modeInput = document.getElementById('form-mode');
   const onlineBtn = document.getElementById('format-btn-online');
@@ -1542,9 +1779,15 @@ function showEditEventModal(event) {
     const studentType = document.getElementById('form-studenttype').value || null;
     const subtypesVal = document.getElementById('form-subtypes').value;
     const subtypes = subtypesVal ? JSON.parse(subtypesVal) : [];
-    const date = document.getElementById('form-date').value;
+    const isTbdChecked = document.getElementById('form-is-tbd')?.checked;
+    const date = isTbdChecked ? 'TBD' : document.getElementById('form-date').value;
     const desc = document.getElementById('form-desc').value.trim();
     
+    if (!isTbdChecked && !date) {
+      alert('Please choose a valid scheduled date or select Date is TBD.');
+      return;
+    }
+
     const submitBtn = e.target.querySelector('.form-submit-btn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Saving...';
@@ -1578,7 +1821,7 @@ function showEditEventModal(event) {
       await fetchEvents();
       hideEventModal();
       generateCalendarGrid();
-      generateMiniCalendar();
+      renderTbdDrives();
       renderAgendaList();
     } catch (err) {
       alert('Failed to update event: ' + err.message);
@@ -1592,6 +1835,8 @@ function showEditEventModal(event) {
 function showCreateEventModal(dateStr) {
   const modal = document.getElementById('event-modal');
   const card = document.getElementById('modal-card-content');
+  const isTbd = dateStr === 'TBD' || !dateStr;
+  const initialDate = isTbd ? '' : dateStr;
   
   card.innerHTML = `
     <div class="modal-header">
@@ -1646,8 +1891,14 @@ function showCreateEventModal(dateStr) {
         <input type="hidden" id="form-subtypes" value="">
       </div>
       <div class="form-group">
-        <label for="form-date">Scheduled Date</label>
-        <input type="date" id="form-date" value="${dateStr}" required>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label for="form-date" style="margin: 0; font-weight: 600;">Scheduled Date</label>
+          <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #b45309; font-weight: 600;">
+            <input type="checkbox" id="form-is-tbd" ${isTbd ? 'checked' : ''}>
+            <span>Date is TBD (Unconfirmed)</span>
+          </label>
+        </div>
+        <input type="date" id="form-date" value="${initialDate}" ${isTbd ? 'disabled' : ''} style="background: ${isTbd ? '#f3f4f6' : 'white'};">
       </div>
       <div class="form-group">
         <label for="form-desc">Details / Description</label>
@@ -1661,6 +1912,19 @@ function showCreateEventModal(dateStr) {
   `;
   modal.classList.add('active');
   
+  // TBD checkbox logic
+  const isTbdCheckbox = document.getElementById('form-is-tbd');
+  const dateInput = document.getElementById('form-date');
+  if (isTbdCheckbox && dateInput) {
+    isTbdCheckbox.addEventListener('change', (e) => {
+      dateInput.disabled = e.target.checked;
+      dateInput.style.background = e.target.checked ? '#f3f4f6' : 'white';
+      if (!e.target.checked && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+      }
+    });
+  }
+
   // Format buttons logic
   const modeInput = document.getElementById('form-mode');
   const onlineBtn = document.getElementById('format-btn-online');
@@ -1748,9 +2012,15 @@ function showCreateEventModal(dateStr) {
     const studentType = document.getElementById('form-studenttype').value || null;
     const subtypesVal = document.getElementById('form-subtypes').value;
     const subtypes = subtypesVal ? JSON.parse(subtypesVal) : [];
-    const date = document.getElementById('form-date').value;
+    const isTbdChecked = document.getElementById('form-is-tbd')?.checked;
+    const date = isTbdChecked ? 'TBD' : document.getElementById('form-date').value;
     const desc = document.getElementById('form-desc').value.trim();
     
+    if (!isTbdChecked && !date) {
+      alert('Please choose a valid scheduled date or select Date is TBD.');
+      return;
+    }
+
     const submitBtn = e.target.querySelector('.form-submit-btn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Posting...';
@@ -1784,7 +2054,7 @@ function showCreateEventModal(dateStr) {
       await fetchEvents();
       hideEventModal();
       generateCalendarGrid();
-      generateMiniCalendar();
+      renderTbdDrives();
       renderAgendaList();
     } catch (err) {
       alert('Failed to create event: ' + err.message);
@@ -1895,7 +2165,8 @@ function showAIPreviewModal(events) {
   events.forEach((ev, idx) => {
     const title = ev.title || 'Placement Update';
     const type = ev.type || 'exams';
-    const date = ev.date || new Date().toISOString().split('T')[0];
+    const isTbd = ev.date === 'TBD' || ev.isTbd === true || !ev.date;
+    const date = isTbd ? '' : ev.date;
     const mode = ev.mode || 'online';
     const location = ev.location || 'rvitm';
     const studentType = ev.studentType || '';
@@ -1911,10 +2182,16 @@ function showAIPreviewModal(events) {
           <input type="text" class="preview-title" value="${escapeHTML(title)}" style="width: 100%; padding: 8px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: 'Inter', sans-serif;">
         </div>
 
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
-          <div class="form-group" style="flex: 1; min-width: 120px;">
-            <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Date</label>
-            <input type="date" class="preview-date" value="${date}" style="width: 100%; padding: 8px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: 'Inter', sans-serif; height: 35px; background: white;">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end;">
+          <div class="form-group" style="flex: 1; min-width: 140px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Date</label>
+              <label style="font-size: 0.75rem; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #b45309; font-weight: 600;">
+                <input type="checkbox" class="preview-tbd-checkbox" ${isTbd ? 'checked' : ''}>
+                <span>Date TBD</span>
+              </label>
+            </div>
+            <input type="date" class="preview-date" value="${date}" ${isTbd ? 'disabled' : ''} style="width: 100%; padding: 8px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: 'Inter', sans-serif; height: 35px; background: ${isTbd ? '#f3f4f6' : 'white'};">
           </div>
           <div class="form-group" style="flex: 1; min-width: 120px;">
             <label style="font-weight: 600; margin-bottom: 4px; display: block; font-size: 0.8rem; color: var(--text-secondary);">Type</label>
@@ -1991,6 +2268,19 @@ function showAIPreviewModal(events) {
   const container = document.getElementById('ai-preview-list-container');
   
   container.querySelectorAll('.ai-event-card').forEach(cardEl => {
+    // TBD checkbox logic
+    const tbdCheckbox = cardEl.querySelector('.preview-tbd-checkbox');
+    const dateInput = cardEl.querySelector('.preview-date');
+    if (tbdCheckbox && dateInput) {
+      tbdCheckbox.addEventListener('change', (e) => {
+        dateInput.disabled = e.target.checked;
+        dateInput.style.background = e.target.checked ? '#f3f4f6' : 'white';
+        if (!e.target.checked && !dateInput.value) {
+          dateInput.value = new Date().toISOString().split('T')[0];
+        }
+      });
+    }
+
     // Mode Buttons
     const modeInput = cardEl.querySelector('.preview-mode');
     const modeBtns = cardEl.querySelectorAll('.format-btn');
@@ -2091,7 +2381,9 @@ function showAIPreviewModal(events) {
     try {
       for (const cardEl of cards) {
         const title = cardEl.querySelector('.preview-title').value.trim();
-        const date = cardEl.querySelector('.preview-date').value;
+        const isTbdChecked = cardEl.querySelector('.preview-tbd-checkbox')?.checked;
+        const dateInputVal = cardEl.querySelector('.preview-date')?.value;
+        const date = isTbdChecked ? 'TBD' : dateInputVal;
         const type = cardEl.querySelector('.preview-type').value;
         const mode = cardEl.querySelector('.preview-mode').value || null;
         const location = cardEl.querySelector('.preview-location').value || null;
@@ -2100,8 +2392,8 @@ function showAIPreviewModal(events) {
         const subtypes = subtypesVal ? JSON.parse(subtypesVal) : [];
         const desc = cardEl.querySelector('.preview-desc').value.trim();
 
-        if (!title || !date) {
-          throw new Error('Title and Date are required for all events.');
+        if (!title || (!date && !isTbdChecked)) {
+          throw new Error('Title and a valid Date (or Date TBD) are required for all events.');
         }
 
         const newEvent = {
@@ -2131,7 +2423,7 @@ function showAIPreviewModal(events) {
       hideEventModal();
       await fetchEvents();
       generateCalendarGrid();
-      generateMiniCalendar();
+      renderTbdDrives();
       renderAgendaList();
     } catch (err) {
       console.error(err);

@@ -683,6 +683,67 @@ def verify_admin_token(authorization: Optional[str] = Header(None)):
 class AIParseRequest(BaseModel):
     text: str
 
+def _sanitize_ai_parsed_events(events, raw_text: str):
+    """
+    Sanitizes parsed events to ensure registration deadlines are never confused with drive dates.
+    If a returned date is only a registration deadline and no actual drive/test/interview date was specified,
+    sets event['date'] = 'TBD'.
+    """
+    import re
+    if not isinstance(events, list):
+        return events
+        
+    month_names = {
+        "01": ["january", "jan"],
+        "02": ["february", "feb"],
+        "03": ["march", "mar"],
+        "04": ["april", "apr"],
+        "05": ["may"],
+        "06": ["june", "jun"],
+        "07": ["july", "jul"],
+        "08": ["august", "aug"],
+        "09": ["september", "sept", "sep"],
+        "10": ["october", "oct"],
+        "11": ["november", "nov"],
+        "12": ["december", "dec"]
+    }
+    
+    deadline_keywords = ["deadline", "last date", "register before", "apply before", "registration closes", "form closes", "apply by", "registration end", "register by"]
+    drive_keywords = ["oa", "online assessment", "written test", "interview", "drive", "ppt", "presentation", "hackathon", "test date", "exam date", "scheduled on", "conducted on", "held on"]
+    
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        d = str(ev.get("date", "")).strip()
+        if not d or d.upper() == "TBD":
+            ev["date"] = "TBD"
+            continue
+            
+        m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", d)
+        if m:
+            year, month_num, day_num = m.group(1), m.group(2), str(int(m.group(3)))
+            m_aliases = month_names.get(month_num, [])
+            
+            lines = raw_text.splitlines()
+            is_registration_deadline = False
+            has_explicit_drive_date = False
+            
+            for line in lines:
+                l_lower = line.lower()
+                has_day = bool(re.search(r'\b0?' + day_num + r'(st|nd|rd|th)?\b', l_lower))
+                has_month = any(alias in l_lower for alias in m_aliases) or (f"{year}-{month_num}" in l_lower) or (f"{day_num}/{month_num}" in l_lower) or (f"{day_num}-{month_num}" in l_lower)
+                
+                if has_day and has_month:
+                    if any(k in l_lower for k in deadline_keywords):
+                        is_registration_deadline = True
+                    if any(k in l_lower for k in drive_keywords):
+                        has_explicit_drive_date = True
+            
+            if is_registration_deadline and not has_explicit_drive_date:
+                ev["date"] = "TBD"
+                
+    return events
+
 @app.post("/api/ai/parse")
 def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(None)):
     """Parse raw text into placement events using Gemini API."""
@@ -696,28 +757,56 @@ def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(N
     
     system_instruction = (
         "You are a strict parser that extracts placement drive updates from raw text and formats them as a JSON array of events.\n"
-        "Response must be ONLY a valid JSON array. Do not include markdown tags or surrounding text.\n"
+        "Response must be ONLY a valid JSON array. Do not include markdown tags or surrounding text.\n\n"
         "Each event object in the array must have:\n"
-        "- title: string (the company name, e.g. \"Google India\")\n"
+        "- title: string (the company name, e.g. \"Tamasha.live\", \"Google\", \"Amazon\")\n"
         "- type: string (\"exams\" or \"holidays\")\n"
         "- mode: string (\"online\" or \"offline\")\n"
         "- location: string (\"rvce\", \"rvitm\", or \"worksite\")\n"
         "- studentType: string (\"BE\", \"MCA\", or \"BE | MCA\" - optional, set null if not specified)\n"
-        "- date: string (date of the event in YYYY-MM-DD format)\n"
-        "- subtypes: list of strings (e.g. [\"OA\"], [\"Technical\"], [\"HR\"])\n"
-        "- desc: string (detailed criteria, branches, package, etc. in a clean, indented markdown bullet points list)\n\n"
-        "If there are multiple rounds on different days, create separate event objects for each day.\n"
-        "Example Output format:\n"
+        "- date: string (date of the event in YYYY-MM-DD format, OR \"TBD\")\n"
+        "- subtypes: list of strings (e.g. [\"OA\"], [\"Technical\"], [\"HR\"], [\"Interview\"])\n"
+        "- desc: string (detailed criteria, branches, stipend/package, registration deadline, link in clean markdown bullet points)\n\n"
+        "CRITICAL RULES FOR \"date\":\n"
+        "1. REGISTRATION DEADLINES ARE NOT DRIVE DATES:\n"
+        "   - Dates labeled as \"Registration Deadline\", \"Deadline\", \"Last date to register\", \"Apply before\", \"Form closing date\" specify when the registration form closes, NOT when the recruitment drive/test/interview is held.\n"
+        "   - Always put the registration deadline inside the \"desc\" field (e.g. \"* **Registration Deadline**: 24th September 2026, 9:00 AM\").\n"
+        "   - NEVER use the registration deadline as the event \"date\"!\n"
+        "2. WHEN TO SET \"date\": \"TBD\":\n"
+        "   - If the raw text does NOT explicitly state the date of the actual drive, Online Assessment (OA), written test, or interview.\n"
+        "   - If only a registration deadline is provided.\n"
+        "   - If the drive date is mentioned as TBD, to be decided, tentative, unconfirmed, to be announced, or will be communicated later.\n"
+        "   - In all these cases, you MUST set \"date\": \"TBD\".\n"
+        "3. WHEN TO SET A SPECIFIC YYYY-MM-DD DATE:\n"
+        "   - ONLY when the text explicitly specifies the date when the actual test, assessment, interview, or drive is conducted (e.g. \"OA on 28th September 2026\", \"Test Date: 2026-10-05\").\n\n"
+        "Example 1: Only Registration Deadline Mentioned (Drive Date is TBD)\n"
+        "Raw Text: \"Tamasha.live | Android Developer Intern | Stipend: 50K | Deadline: 24th September 2026, 9AM | Registration Link: https://...\"\n"
+        "Output:\n"
+        "[\n"
+        "  {\n"
+        "    \"title\": \"Tamasha.live\",\n"
+        "    \"type\": \"exams\",\n"
+        "    \"mode\": \"online\",\n"
+        "    \"location\": \"worksite\",\n"
+        "    \"studentType\": \"BE | MCA\",\n"
+        "    \"date\": \"TBD\",\n"
+        "    \"subtypes\": [\"OA\", \"Technical\"],\n"
+        "    \"desc\": \"* **Role**: Android Developer Intern\\n* **Stipend**: ₹40,000 – ₹50,000 / month\\n* **PPO**: ₹12 – ₹14 LPA\\n* **Registration Deadline**: 24th September 2026, 9:00 AM\\n* **Eligibility**: Backlog students can apply, No CGPA criteria\\n* **Registration Link**: https://...\"\n"
+        "  }\n"
+        "]\n\n"
+        "Example 2: Confirmed Assessment Date Mentioned\n"
+        "Raw Text: \"Google Software Engineer. Registration deadline: 5th August 2026. Online Assessment (OA) will be held on 10th August 2026. CTC: 35 LPA.\"\n"
+        "Output:\n"
         "[\n"
         "  {\n"
         "    \"title\": \"Google\",\n"
         "    \"type\": \"exams\",\n"
         "    \"mode\": \"online\",\n"
         "    \"location\": \"rvce\",\n"
-        "    \"studentType\": \"BE | MCA\",\n"
+        "    \"studentType\": \"BE\",\n"
         "    \"date\": \"2026-08-10\",\n"
         "    \"subtypes\": [\"OA\"],\n"
-        "    \"desc\": \"* **Package**: 35 LPA\\n* **Eligibility**: CGPA >= 7.5\\n* **Eligible Branches**: CSE, ISE\"\n"
+        "    \"desc\": \"* **Role**: Software Engineer\\n* **CTC**: 35 LPA\\n* **Registration Deadline**: 5th August 2026\"\n"
         "  }\n"
         "]"
     )
@@ -744,7 +833,8 @@ def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(N
         with urllib.request.urlopen(request, timeout=30) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             text_out = res_data["candidates"][0]["content"]["parts"][0]["text"]
-            return json.loads(text_out)
+            parsed_events = json.loads(text_out)
+            return _sanitize_ai_parsed_events(parsed_events, req.text)
     except Exception as e:
         import traceback
         traceback.print_exc()

@@ -96,7 +96,7 @@ module.exports = async function (req, res) {
 
     // POST /api/events - Create new event
     if (req.method === 'POST') {
-      const { id, title, type, mode, location, subtypes, date, desc } = req.body || {};
+      const { id, title, type, mode, location, studentType, subtypes, date, desc } = req.body || {};
       
       // Strict type checking to prevent NoSQL injection
       if (typeof id !== 'number' || typeof title !== 'string' || typeof type !== 'string' || typeof date !== 'string' || typeof desc !== 'string') {
@@ -106,8 +106,9 @@ module.exports = async function (req, res) {
       let googleEventId = null;
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
       const auth = getGoogleAuth();
+      const isTbd = date.trim().toUpperCase() === 'TBD';
       
-      if (auth && calendarId) {
+      if (auth && calendarId && !isTbd) {
         try {
           const calendar = google.calendar({ version: 'v3', auth });
           const eventDate = new Date(date);
@@ -117,7 +118,7 @@ module.exports = async function (req, res) {
           
           const gCalEvent = {
             summary: title,
-            description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : ''),
+            description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : '') + (studentType ? `\nTarget: ${studentType}` : ''),
             start: { date: date }, // all-day event format
             end: { date: nextDayStr }, // exclusive end date
           };
@@ -138,8 +139,9 @@ module.exports = async function (req, res) {
         type: String(type).trim(),
         mode: mode ? String(mode).trim() : null,
         location: location ? String(location).trim() : null,
+        studentType: studentType ? String(studentType).trim() : null,
         subtypes: Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()) : [],
-        date: String(date).trim(),
+        date: isTbd ? 'TBD' : String(date).trim(),
         desc: String(desc).trim(),
         googleEventId: googleEventId
       };
@@ -150,7 +152,7 @@ module.exports = async function (req, res) {
 
     // PUT /api/events - Update existing event
     if (req.method === 'PUT') {
-      const { id, title, type, mode, location, subtypes, date, desc } = req.body || {};
+      const { id, title, type, mode, location, studentType, subtypes, date, desc } = req.body || {};
       
       if (typeof id !== 'number') {
         return res.status(400).json({ detail: 'Invalid event ID.' });
@@ -160,42 +162,64 @@ module.exports = async function (req, res) {
       const query = { id: Number(id) };
       const existingEvent = await collection.findOne(query);
 
+      const isTbd = date ? date.trim().toUpperCase() === 'TBD' : false;
+
       const updatedFields = {
         title: String(title).trim(),
         type: String(type).trim(),
         mode: mode ? String(mode).trim() : null,
         location: location ? String(location).trim() : null,
+        studentType: studentType ? String(studentType).trim() : null,
         subtypes: Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()) : [],
-        date: String(date).trim(),
+        date: isTbd ? 'TBD' : String(date).trim(),
         desc: String(desc).trim()
       };
 
-      const googleEventId = existingEvent?.googleEventId;
+      let googleEventId = existingEvent?.googleEventId;
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
       const auth = getGoogleAuth();
 
-      if (googleEventId && auth && calendarId) {
+      if (auth && calendarId) {
         try {
           const calendar = google.calendar({ version: 'v3', auth });
-          const eventDate = new Date(date);
-          const nextDay = new Date(eventDate);
-          nextDay.setDate(nextDay.getDate() + 1);
-          const nextDayStr = nextDay.toISOString().split('T')[0];
-          
-          const gCalEvent = {
-            summary: title,
-            description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : ''),
-            start: { date: date },
-            end: { date: nextDayStr },
-          };
-          
-          await calendar.events.update({
-            calendarId: calendarId,
-            eventId: googleEventId,
-            resource: gCalEvent,
-          });
+          if (!isTbd) {
+            const eventDate = new Date(date);
+            const nextDay = new Date(eventDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const nextDayStr = nextDay.toISOString().split('T')[0];
+            
+            const gCalEvent = {
+              summary: title,
+              description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : '') + (studentType ? `\nTarget: ${studentType}` : ''),
+              start: { date: date },
+              end: { date: nextDayStr },
+            };
+            
+            if (googleEventId) {
+              await calendar.events.update({
+                calendarId: calendarId,
+                eventId: googleEventId,
+                resource: gCalEvent,
+              });
+            } else {
+              // Promoted from TBD to a scheduled date
+              const response = await calendar.events.insert({
+                calendarId: calendarId,
+                resource: gCalEvent,
+              });
+              googleEventId = response.data.id;
+              updatedFields.googleEventId = googleEventId;
+            }
+          } else if (googleEventId) {
+            // Moved back to TBD from a scheduled date
+            await calendar.events.delete({
+              calendarId: calendarId,
+              eventId: googleEventId,
+            });
+            updatedFields.googleEventId = null;
+          }
         } catch (err) {
-          console.error("Google Calendar Update Error:", err);
+          console.error("Google Calendar Sync Error on Update:", err);
         }
       }
 
