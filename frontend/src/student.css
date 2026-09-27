@@ -1083,6 +1083,30 @@ tr:hover td {
   color: var(--wood-dark);
 }
 
+/* Calendar Skeleton Loading Shimmer for cold starts */
+@keyframes tbdSkeletonShimmer {
+  0% { opacity: 0.55; background-position: -200% 0; }
+  50% { opacity: 0.95; }
+  100% { opacity: 0.55; background-position: 200% 0; }
+}
+
+.tbd-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.tbd-skeleton-item {
+  height: 58px;
+  border-radius: var(--radius-md, 8px);
+  background: linear-gradient(90deg, rgba(235, 225, 212, 0.45) 25%, rgba(245, 240, 232, 0.9) 50%, rgba(235, 225, 212, 0.45) 75%);
+  background-size: 200% 100%;
+  animation: tbdSkeletonShimmer 1.4s ease-in-out infinite;
+  border: 1px solid var(--border-gold);
+  box-sizing: border-box;
+}
+
 .tbd-card {
   background: #fdfbf7;
   border: 1px solid var(--border-gold);

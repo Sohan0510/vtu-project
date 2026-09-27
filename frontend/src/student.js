@@ -103,24 +103,73 @@ async function sha256(message) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Placement Calendar Database array
-let calendarEvents = [];
-let eventsFetched = false;
+const EVENTS_CACHE_KEY = 'vtu_calendar_events_cache';
 
-// Fetch events from secure backend
-async function fetchEvents() {
+// Load initial events synchronously from localStorage for instant 0ms rendering
+function loadCachedEvents() {
   try {
-    const res = await fetch(`${API}/api/events`);
+    const raw = localStorage.getItem(EVENTS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse cached events:', e);
+  }
+  return [];
+}
+
+// Save fresh events payload to localStorage cache
+function saveCachedEvents(events) {
+  try {
+    if (Array.isArray(events)) {
+      localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(events));
+    }
+  } catch (e) {
+    console.warn('Failed to save events to cache:', e);
+  }
+}
+
+// Placement Calendar Database array — loaded synchronously from localStorage
+let calendarEvents = loadCachedEvents();
+let eventsFetched = calendarEvents.length > 0;
+
+// Fetch events from secure backend using Stale-While-Revalidate pattern
+async function fetchEvents(forceRender = false) {
+  try {
+    const url = forceRender ? `${API}/api/events?_t=${Date.now()}` : `${API}/api/events`;
+    const res = await fetch(url);
     if (res.ok) {
-      calendarEvents = await res.json();
-    } else {
-      calendarEvents = [];
+      const freshEvents = await res.json();
+      if (Array.isArray(freshEvents)) {
+        const prevJson = JSON.stringify(calendarEvents);
+        const nextJson = JSON.stringify(freshEvents);
+        const hasChanged = prevJson !== nextJson;
+
+        calendarEvents = freshEvents;
+        saveCachedEvents(freshEvents);
+        eventsFetched = true;
+
+        // If data changed or forceRender was requested, seamlessly refresh calendar components
+        if (hasChanged || forceRender) {
+          if (currentView === 'calendar') {
+            generateCalendarGrid();
+            renderTbdDrives();
+            renderAgendaList();
+          } else if (currentView === 'home') {
+            triggerUpcomingToast();
+          }
+        }
+        return freshEvents;
+      }
     }
   } catch (err) {
-    console.error('Failed to fetch events:', err);
-    calendarEvents = [];
+    console.error('Failed to fetch events in background:', err);
   }
   eventsFetched = true;
+  return calendarEvents;
 }
 
 // Router Entry
@@ -890,22 +939,32 @@ function renderTbdDrives() {
   `;
 
   if (tbdEvents.length === 0) {
-    html += `
-      <div class="tbd-empty-state">
-        <div class="tbd-empty-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="1.6" fill="none">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
+    if (!eventsFetched && calendarEvents.length === 0) {
+      html += `
+        <div class="tbd-skeleton-list">
+          <div class="tbd-skeleton-item"></div>
+          <div class="tbd-skeleton-item"></div>
+          <div class="tbd-skeleton-item"></div>
         </div>
-        <span class="tbd-empty-text">No unconfirmed drives pending.</span>
-        ${isAdmin ? `
-          <button type="button" class="tbd-empty-add-btn" id="btn-add-tbd-empty">
-            + Add First TBD Drive
-          </button>
-        ` : ''}
-      </div>
-    `;
+      `;
+    } else {
+      html += `
+        <div class="tbd-empty-state">
+          <div class="tbd-empty-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="1.6" fill="none">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <span class="tbd-empty-text">No unconfirmed drives pending.</span>
+          ${isAdmin ? `
+            <button type="button" class="tbd-empty-add-btn" id="btn-add-tbd-empty">
+              + Add First TBD Drive
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }
   } else {
     tbdEvents.forEach(ev => {
       const modeTag = ev.mode ? `<span class="tbd-mode-tag mode-${ev.mode}">${ev.mode.toUpperCase()}</span>` : '';
@@ -1018,7 +1077,7 @@ function renderTbdDrives() {
             
             if (!res.ok) throw new Error('Delete failed');
             
-            await fetchEvents();
+            await fetchEvents(true);
             generateCalendarGrid();
             renderTbdDrives();
             renderAgendaList();
@@ -1416,7 +1475,7 @@ function showScheduleDateModal(event) {
         }
       }
 
-      await fetchEvents();
+      await fetchEvents(true);
       hideEventModal();
       generateCalendarGrid();
       renderTbdDrives();
@@ -1745,7 +1804,7 @@ function renderAgendaList() {
             
             if (!res.ok) throw new Error('Delete failed');
             
-            await fetchEvents();
+            await fetchEvents(true);
             generateCalendarGrid();
             renderAgendaList();
           } catch (err) {
@@ -1942,7 +2001,7 @@ function showEventDetailModalAdmin(event) {
         
         if (!res.ok) throw new Error('Delete failed');
         
-        await fetchEvents();
+        await fetchEvents(true);
         hideEventModal();
         generateCalendarGrid();
         renderTbdDrives();
@@ -2185,7 +2244,7 @@ function showEditEventModal(event) {
         throw new Error(errData.detail || `Server returned ${res.status}`);
       }
       
-      await fetchEvents();
+      await fetchEvents(true);
       hideEventModal();
       generateCalendarGrid();
       renderTbdDrives();
@@ -2418,7 +2477,7 @@ function showCreateEventModal(dateStr) {
         throw new Error(errData.detail || `Server returned ${res.status}`);
       }
       
-      await fetchEvents();
+      await fetchEvents(true);
       hideEventModal();
       generateCalendarGrid();
       renderTbdDrives();
@@ -2788,7 +2847,7 @@ function showAIPreviewModal(events) {
       }
 
       hideEventModal();
-      await fetchEvents();
+      await fetchEvents(true);
       generateCalendarGrid();
       renderTbdDrives();
       renderAgendaList();
@@ -3567,13 +3626,17 @@ async function boot() {
     return;
   }
 
-  // Render UI immediately so user doesn't wait on a blank screen
+  // Render UI immediately so user doesn't wait on a blank screen (populated instantly from cache)
   render();
 
-  // Fetch calendar events in the background
+  // Fetch calendar events in the background with Stale-While-Revalidate
   fetchEvents().then(() => {
-    if (currentView === 'calendar') render();
-    else if (currentView === 'home') triggerUpcomingToast();
+    if (currentView === 'calendar') {
+      generateCalendarGrid();
+      renderTbdDrives();
+    } else if (currentView === 'home') {
+      triggerUpcomingToast();
+    }
   });
 
   const token = sessionStorage.getItem('adminToken');

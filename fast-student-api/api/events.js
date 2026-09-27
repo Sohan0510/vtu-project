@@ -5,6 +5,11 @@ const { google } = require('googleapis');
 // Cached connection for performance
 let cachedClient = null;
 
+// In-memory cache for events to eliminate redundant MongoDB Atlas queries
+let inMemoryEvents = null;
+let lastCacheTime = 0;
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
 async function connectToDatabase() {
   if (cachedClient) return cachedClient;
   const client = await MongoClient.connect(process.env.MONGO_URI, {
@@ -80,12 +85,22 @@ module.exports = async function (req, res) {
 
     // GET /api/events - Publicly fetch all events
     if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+      
+      const now = Date.now();
+      if (inMemoryEvents && (now - lastCacheTime) < CACHE_TTL_MS) {
+        return res.status(200).json(inMemoryEvents);
+      }
+
       const events = await collection.find({}).toArray();
       // Remove MongoDB internal _id before sending to frontend
       const cleanedEvents = events.map(ev => {
         delete ev._id;
         return ev;
       });
+
+      inMemoryEvents = cleanedEvents;
+      lastCacheTime = now;
       return res.status(200).json(cleanedEvents);
     }
 
@@ -147,6 +162,8 @@ module.exports = async function (req, res) {
       };
 
       await collection.insertOne(newEvent);
+      inMemoryEvents = null;
+      lastCacheTime = 0;
       return res.status(201).json({ detail: 'Event created.' });
     }
 
@@ -224,6 +241,8 @@ module.exports = async function (req, res) {
       }
 
       await collection.updateOne(query, { $set: updatedFields });
+      inMemoryEvents = null;
+      lastCacheTime = 0;
       
       return res.status(200).json({ detail: 'Event updated.' });
     }
@@ -256,6 +275,8 @@ module.exports = async function (req, res) {
       }
 
       await collection.deleteOne(query);
+      inMemoryEvents = null;
+      lastCacheTime = 0;
       
       return res.status(200).json({ detail: 'Event deleted.' });
     }

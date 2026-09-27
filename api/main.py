@@ -10,8 +10,9 @@ import os
 import threading
 import uuid
 import json
+import time
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Query, Header
+from fastapi import FastAPI, HTTPException, Query, Header, Response
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -840,19 +841,41 @@ def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(N
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
 
+# In-memory events cache for high-concurrency 0ms responses
+_cached_events = None
+_last_events_cache_time = 0.0
+EVENTS_CACHE_TTL = 60.0  # 60 seconds
+
 @app.get("/api/events")
-def get_calendar_events():
-    """Retrieve all calendar events."""
+def get_calendar_events(response: Response):
+    """Retrieve all calendar events with memory caching and edge CDN headers."""
+    global _cached_events, _last_events_cache_time
+    now = time.time()
+    
+    if _cached_events is not None and (now - _last_events_cache_time) < EVENTS_CACHE_TTL:
+        response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
+        return _cached_events
+
+    events = None
     if USE_MONGO_FOR_EVENTS and events_collection is not None:
         try:
-            return list(events_collection.find({}, {"_id": 0}))
+            events = list(events_collection.find({}, {"_id": 0}))
         except Exception:
             pass
-    return load_events_from_json()
+    if events is None:
+        events = load_events_from_json()
+        
+    _cached_events = events
+    _last_events_cache_time = now
+    response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
+    return events
 
 @app.post("/api/events")
 def create_calendar_event(req: EventRequest, authorization: Optional[str] = Header(None)):
     """Create a new calendar event."""
+    global _cached_events, _last_events_cache_time
+    _cached_events = None
+    _last_events_cache_time = 0.0
     verify_token(authorization)
     event_data = req.dict()
     
@@ -880,6 +903,9 @@ def create_calendar_event(req: EventRequest, authorization: Optional[str] = Head
 @app.put("/api/events")
 def update_calendar_event(req: EventRequest, authorization: Optional[str] = Header(None)):
     """Update an existing calendar event."""
+    global _cached_events, _last_events_cache_time
+    _cached_events = None
+    _last_events_cache_time = 0.0
     verify_token(authorization)
     event_data = req.dict()
     
@@ -911,6 +937,9 @@ def update_calendar_event(req: EventRequest, authorization: Optional[str] = Head
 @app.delete("/api/events")
 def delete_calendar_event(req: DeleteEventRequest, authorization: Optional[str] = Header(None)):
     """Delete a calendar event."""
+    global _cached_events, _last_events_cache_time
+    _cached_events = None
+    _last_events_cache_time = 0.0
     verify_token(authorization)
     
     if USE_MONGO_FOR_EVENTS and events_collection is not None:
