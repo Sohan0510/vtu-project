@@ -38,14 +38,33 @@ function escapeHTML(str) {
     .replace(/'/g, '&#39;');
 }
 
-// Formats description text into HTML, converting bullet points to list tags and preserving newlines
+// Formats description text into HTML, converting markdown bold/italics, links, bullet points, and preserving structure
 function formatEventDescription(desc) {
   if (!desc) return '';
-  const escaped = escapeHTML(desc);
-  const lines = escaped.split(/\r?\n/);
+  const lines = String(desc).split(/\r?\n/);
   
   let html = [];
   let inList = false;
+
+  function formatInline(text) {
+    let escaped = escapeHTML(text);
+    
+    // Markdown bold: **text** or __text__
+    escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    escaped = escaped.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    
+    // Markdown italic: *text* or _text_
+    escaped = escaped.replace(/(^|[^\*])\*([^\*]+?)\*([^\*]|$)/g, '$1<em>$2</em>$3');
+    escaped = escaped.replace(/(^|[^_])_([^_]+?)_([^_]|$)/g, '$1<em>$2</em>$3');
+    
+    // Clickable URLs: http:// or https://
+    escaped = escaped.replace(
+      /(https?:\/\/[^\s<]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer" class="desc-link">$1</a>'
+    );
+    
+    return escaped;
+  }
   
   for (let line of lines) {
     const trimmed = line.trim();
@@ -54,20 +73,19 @@ function formatEventDescription(desc) {
     
     if (listMatch) {
       if (!inList) {
-        html.push('<ul class="desc-list">');
+        html.push('<ul class="modal-desc-list">');
         inList = true;
       }
-      html.push(`<li>${listMatch[2]}</li>`);
+      html.push(`<li>${formatInline(listMatch[2])}</li>`);
     } else {
       if (inList) {
         html.push('</ul>');
         inList = false;
       }
       if (trimmed === '') {
-        html.push('<div class="desc-empty-line"></div>');
+        html.push('<div class="desc-empty-line" style="height: 6px;"></div>');
       } else {
-        // Keep original line spacing and indentation by using line instead of trimmed
-        html.push(`<p class="desc-text-line">${line}</p>`);
+        html.push(`<p class="desc-text-line">${formatInline(line)}</p>`);
       }
     }
   }
@@ -1015,75 +1033,407 @@ function renderTbdDrives() {
   });
 }
 
-// 4.6. Modal to confirm date for TBD event (Promote to live calendar)
+// 4.6. Modal to confirm date for TBD event & Multi-Round Stage Scheduler
 function showScheduleDateModal(event) {
   const modal = document.getElementById('event-modal');
   const card = document.getElementById('modal-card-content');
   if (!modal || !card) return;
 
+  const isTbd = !event.date || event.date.trim().toUpperCase() === 'TBD';
   const todayStr = new Date().toISOString().split('T')[0];
-  
+
+  // Extract existing subtypes on this event
+  const existingSubtypes = (Array.isArray(event.subtypes) ? event.subtypes : [])
+    .map(s => String(s).trim())
+    .filter(s => s.length > 0);
+
+  // Common placement drive stages
+  const standardRounds = ['OA', 'Technical', 'HR', 'Interview', 'PPT', 'GD', 'Full Drive'];
+
+  // Combine with existing first, then standard ones
+  const availableRounds = [...existingSubtypes];
+  standardRounds.forEach(r => {
+    if (!availableRounds.some(a => a.toLowerCase() === r.toLowerCase())) {
+      availableRounds.push(r);
+    }
+  });
+
+  // Extract preview line from description
+  let descSnippet = '';
+  if (event.desc) {
+    const firstLine = event.desc.split(/\r?\n/).find(l => l.trim().length > 0) || '';
+    descSnippet = firstLine.replace(/[*#_•\-]/g, '').trim();
+    if (descSnippet.length > 90) descSnippet = descSnippet.substring(0, 87) + '...';
+  }
+
+  // Tags for company banner
+  const modeTag = event.mode ? `<span class="tbd-mode-tag mode-${event.mode}">${event.mode.toUpperCase()}</span>` : '';
+  const locationLabel = (event.location === 'rvitm' || event.location === 'oncampus') ? 'RVITM' : (event.location === 'rvce' || event.location === 'offcampus') ? 'RVCE' : event.location === 'worksite' ? 'WORKSITE' : '';
+  const locationClass = (event.location === 'rvitm' || event.location === 'oncampus') ? 'oncampus' : (event.location === 'rvce' || event.location === 'offcampus') ? 'offcampus' : 'worksite';
+  const locationTag = event.location ? `<span class="tbd-mode-tag mode-${locationClass}">${locationLabel}</span>` : '';
+  const studentTypeTag = event.studentType ? `<span class="tbd-mode-tag mode-studenttype-${event.studentType.toLowerCase().replace(/[^a-z0-9]+/g, '-')}">${event.studentType.toUpperCase()}</span>` : '';
+
+  // Internal state for round rows
+  let rows = [
+    {
+      id: 1,
+      stage: existingSubtypes[0] || 'OA',
+      customStage: '',
+      date: todayStr,
+      mode: event.mode || 'online'
+    }
+  ];
+
   card.innerHTML = `
     <div class="modal-header">
-      <h3 style="font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.5rem; font-weight: 700; color: var(--wood-dark); display: flex; align-items: center; gap: 8px;">
-        📅 Schedule Date for ${escapeHTML(event.title)}
-      </h3>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <h3 style="font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.55rem; font-weight: 700; color: var(--wood-dark); margin: 0; display: flex; align-items: center; gap: 8px;">
+          📅 Schedule Rounds for ${escapeHTML(event.title)}
+        </h3>
+      </div>
       <button class="modal-close" onclick="hideEventModal()">&times;</button>
     </div>
-    <form id="schedule-date-form" class="modal-form" style="padding: 20px;">
-      <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0 0 16px 0; line-height: 1.4;">
-        Assign a confirmed date for <strong>${escapeHTML(event.title)}</strong> to move it from the TBD pipeline to the live placement calendar.
-      </p>
-      <div class="form-group" style="margin-bottom: 20px;">
-        <label for="schedule-confirmed-date" style="font-weight: 600; margin-bottom: 6px; display: block; font-size: 0.85rem; color: var(--text-secondary);">Confirmed Drive Date</label>
-        <input type="date" id="schedule-confirmed-date" value="${todayStr}" required style="width: 100%; padding: 10px; border: 1px solid var(--border-gold); border-radius: var(--radius-sm); font-size: 0.9rem; font-family: 'Inter', sans-serif; background: white;">
+
+    <div class="schedule-modal-content">
+      <!-- Target Company Banner -->
+      <div class="schedule-company-banner">
+        <div class="schedule-banner-top">
+          <span class="schedule-company-name">${escapeHTML(event.title)}</span>
+          <div class="schedule-banner-tags">
+            ${studentTypeTag}
+            ${modeTag}
+            ${locationTag}
+          </div>
+        </div>
+        ${descSnippet ? `<div class="schedule-banner-desc">${escapeHTML(descSnippet)}</div>` : ''}
       </div>
-      <div id="schedule-error" class="login-error-msg" style="margin-bottom: 15px;"></div>
-      <div class="form-submit-group" style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button type="button" class="form-cancel-btn" onclick="hideEventModal()">Cancel</button>
-        <button type="submit" class="form-submit-btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 700;">
-          Confirm Date & Schedule
+
+      <p class="schedule-intro-text">
+        Select recruitment rounds (e.g. <strong>OA</strong>, <strong>Technical</strong>, <strong>HR</strong>) and set confirmed dates. Duplicate events will be placed on the live calendar with complete company details preserved.
+      </p>
+
+      <!-- Dynamic Round Rows -->
+      <div id="schedule-rows-container" class="schedule-rows-list"></div>
+
+      <!-- Add Another Round Button -->
+      <div class="schedule-add-row-wrapper">
+        <button type="button" id="btn-add-schedule-row" class="schedule-add-btn">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>+ Add another round on a different date (e.g. Technical / Interview)</span>
         </button>
       </div>
-    </form>
+
+      <!-- TBD Pipeline Retention Box -->
+      ${isTbd ? `
+        <div class="schedule-pipeline-box">
+          <label class="schedule-checkbox-label" for="schedule-keep-tbd">
+            <input type="checkbox" id="schedule-keep-tbd" checked>
+            <div class="schedule-checkbox-content">
+              <span class="schedule-checkbox-title" id="schedule-keep-tbd-title">Keep company in Upcoming / TBD list for remaining rounds</span>
+              <span class="schedule-checkbox-hint" id="schedule-keep-tbd-hint">
+                The company will stay in your TBD pipeline with unconfirmed rounds so you can confirm future dates later without re-creating the drive.
+              </span>
+            </div>
+          </label>
+        </div>
+      ` : `
+        <div class="schedule-pipeline-box" style="background: rgba(37, 99, 235, 0.05); border-color: rgba(37, 99, 235, 0.2);">
+          <div style="font-size: 0.82rem; color: #1e40af; line-height: 1.45;">
+            💡 <strong>Multi-Date Scheduling:</strong> This will create duplicate calendar events on the selected dates for the new rounds while preserving company details.
+          </div>
+        </div>
+      `}
+
+      <div id="schedule-error-msg" class="login-error-msg" style="display: none; margin-top: 12px;"></div>
+    </div>
+
+    <div class="form-submit-group" style="padding-top: 14px; border-top: 1px solid var(--border-gold); margin-top: 14px; display: flex; gap: 12px; justify-content: flex-end;">
+      <button type="button" class="form-cancel-btn" onclick="hideEventModal()">Cancel</button>
+      <button type="button" id="schedule-submit-btn" class="form-submit-btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+        <span>Confirm Date & Schedule</span>
+      </button>
+    </div>
   `;
   modal.classList.add('active');
 
-  document.getElementById('schedule-date-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const newDate = document.getElementById('schedule-confirmed-date').value;
-    const submitBtn = e.target.querySelector('.form-submit-btn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Scheduling...';
-    const token = sessionStorage.getItem('adminToken');
-    
-    try {
-      const res = await fetch(`${API}/api/events`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          ...event,
-          date: newDate
-        })
-      });
-      if (!res.ok) {
-        let errData = {};
-        try { errData = await res.json(); } catch(e) {}
-        throw new Error(errData.detail || 'Failed to update event date.');
+  function updateTbdHint() {
+    if (!isTbd) return;
+    const titleEl = document.getElementById('schedule-keep-tbd-title');
+    const hintEl = document.getElementById('schedule-keep-tbd-hint');
+    const checkboxEl = document.getElementById('schedule-keep-tbd');
+    if (!titleEl || !hintEl || !checkboxEl) return;
+
+    const scheduledStages = rows.map(r => (r.stage === 'Custom' ? (r.customStage || 'Custom') : r.stage).trim().toLowerCase());
+    const remaining = existingSubtypes.filter(s => !scheduledStages.includes(s.toLowerCase()));
+
+    if (remaining.length > 0) {
+      titleEl.textContent = `Keep in Upcoming / TBD for remaining rounds (${remaining.join(', ')})`;
+      hintEl.textContent = `"${escapeHTML(event.title)}" will remain in TBD with rounds: ${remaining.join(', ')}. You can set their dates later.`;
+    } else {
+      titleEl.textContent = `Keep in Upcoming / TBD pipeline for future updates`;
+      hintEl.textContent = `Uncheck if all rounds are scheduled and you want to remove "${escapeHTML(event.title)}" from the TBD sidebar.`;
+    }
+  }
+
+  function renderRows() {
+    const container = document.getElementById('schedule-rows-container');
+    if (!container) return;
+
+    container.innerHTML = rows.map((row, index) => {
+      const isCustom = row.stage === 'Custom';
+      const currentStageName = isCustom ? (row.customStage || 'Custom') : row.stage;
+
+      const pillsHtml = availableRounds.map(rnd => {
+        const isSelected = !isCustom && row.stage.toLowerCase() === rnd.toLowerCase();
+        return `<button type="button" class="schedule-stage-pill ${isSelected ? 'active' : ''}" data-row-idx="${index}" data-stage="${rnd}">${rnd}</button>`;
+      }).join('') + `<button type="button" class="schedule-stage-pill ${isCustom ? 'active' : ''}" data-row-idx="${index}" data-stage="Custom">Custom...</button>`;
+
+      return `
+        <div class="schedule-round-card" data-row-idx="${index}">
+          <div class="schedule-round-header">
+            <div class="schedule-round-title">
+              <span class="schedule-round-number">Round ${index + 1}</span>
+              <span class="schedule-round-badge">${escapeHTML(currentStageName)}</span>
+            </div>
+            ${rows.length > 1 ? `
+              <button type="button" class="schedule-remove-row-btn" data-row-idx="${index}" title="Remove this round date">
+                &times; Remove
+              </button>
+            ` : ''}
+          </div>
+
+          <div class="schedule-field-group">
+            <label class="schedule-field-label">Select Round / Stage</label>
+            <div class="schedule-pills-list">
+              ${pillsHtml}
+            </div>
+            ${isCustom ? `
+              <input type="text" class="schedule-custom-stage-input" data-row-idx="${index}" placeholder="Type stage name (e.g. Coding Test 2, Hackathon...)" value="${escapeHTML(row.customStage || '')}">
+            ` : ''}
+          </div>
+
+          <div class="schedule-grid-row">
+            <div class="schedule-field-group" style="flex: 1.4;">
+              <label class="schedule-field-label">Confirmed Date</label>
+              <input type="date" class="schedule-date-input" data-row-idx="${index}" value="${row.date}" required>
+            </div>
+            <div class="schedule-field-group" style="flex: 1;">
+              <label class="schedule-field-label">Mode / Format</label>
+              <div class="schedule-mode-toggle">
+                <button type="button" class="schedule-mode-btn ${row.mode === 'online' ? 'active' : ''}" data-row-idx="${index}" data-mode="online">Online</button>
+                <button type="button" class="schedule-mode-btn ${row.mode === 'offline' ? 'active' : ''}" data-row-idx="${index}" data-mode="offline">Offline</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Update submit button text
+    const submitBtn = document.getElementById('schedule-submit-btn');
+    if (submitBtn) {
+      if (rows.length === 1) {
+        const stageName = rows[0].stage === 'Custom' ? (rows[0].customStage || 'Custom') : rows[0].stage;
+        submitBtn.innerHTML = `<span>Confirm Date & Schedule (${stageName})</span>`;
+      } else {
+        submitBtn.innerHTML = `<span>Confirm & Schedule (${rows.length} Rounds)</span>`;
       }
-      
+    }
+
+    updateTbdHint();
+
+    // Attach listeners inside rows
+    container.querySelectorAll('.schedule-stage-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.getAttribute('data-row-idx'));
+        const stage = btn.getAttribute('data-stage');
+        rows[idx].stage = stage;
+        if (stage !== 'Custom') {
+          if (stage === 'OA' || stage === 'PPT') rows[idx].mode = 'online';
+          if (stage === 'Technical' || stage === 'HR' || stage === 'Interview') {
+            if (event.mode) rows[idx].mode = event.mode;
+          }
+        }
+        renderRows();
+      });
+    });
+
+    container.querySelectorAll('.schedule-custom-stage-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const idx = parseInt(input.getAttribute('data-row-idx'));
+        rows[idx].customStage = e.target.value;
+        const badge = container.querySelector(`.schedule-round-card[data-row-idx="${idx}"] .schedule-round-badge`);
+        if (badge) badge.textContent = e.target.value.trim() || 'Custom';
+        updateTbdHint();
+      });
+    });
+
+    container.querySelectorAll('.schedule-date-input').forEach(input => {
+      input.addEventListener('change', (e) => {
+        const idx = parseInt(input.getAttribute('data-row-idx'));
+        rows[idx].date = e.target.value;
+      });
+    });
+
+    container.querySelectorAll('.schedule-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.getAttribute('data-row-idx'));
+        const mode = btn.getAttribute('data-mode');
+        rows[idx].mode = mode;
+        const parent = btn.closest('.schedule-mode-toggle');
+        parent.querySelectorAll('.schedule-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    container.querySelectorAll('.schedule-remove-row-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.getAttribute('data-row-idx'));
+        rows.splice(idx, 1);
+        renderRows();
+      });
+    });
+  }
+
+  // Initial render
+  renderRows();
+
+  // Add Row Button
+  document.getElementById('btn-add-schedule-row')?.addEventListener('click', () => {
+    const usedStages = rows.map(r => r.stage.toLowerCase());
+    const nextUnused = availableRounds.find(r => !usedStages.includes(r.toLowerCase())) || 'Technical';
+    const smartMode = (nextUnused === 'OA' || nextUnused === 'PPT') ? 'online' : (event.mode || 'offline');
+
+    let nextDate = todayStr;
+    if (rows.length > 0 && rows[rows.length - 1].date) {
+      nextDate = rows[rows.length - 1].date;
+    }
+
+    rows.push({
+      id: Date.now(),
+      stage: nextUnused,
+      customStage: '',
+      date: nextDate,
+      mode: smartMode
+    });
+    renderRows();
+  });
+
+  // Submit Handler
+  document.getElementById('schedule-submit-btn')?.addEventListener('click', async () => {
+    const errorEl = document.getElementById('schedule-error-msg');
+    if (errorEl) {
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+    }
+
+    // Validation
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.stage === 'Custom' && (!row.customStage || !row.customStage.trim())) {
+        if (errorEl) {
+          errorEl.textContent = `Please enter a stage name for Round ${i + 1}.`;
+          errorEl.style.display = 'block';
+        }
+        return;
+      }
+      if (!row.date || !row.date.trim()) {
+        if (errorEl) {
+          errorEl.textContent = `Please select a valid date for Round ${i + 1}.`;
+          errorEl.style.display = 'block';
+        }
+        return;
+      }
+    }
+
+    const submitBtn = document.getElementById('schedule-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span>Scheduling...</span>';
+    const token = sessionStorage.getItem('adminToken');
+
+    try {
+      const scheduledRoundNames = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const stageName = row.stage === 'Custom' ? row.customStage.trim() : row.stage.trim();
+        scheduledRoundNames.push(stageName);
+
+        const newEventId = Date.now() + Math.floor(Math.random() * 10000) + (i * 37);
+        const newEvent = {
+          id: newEventId,
+          title: event.title,
+          type: event.type || 'exams',
+          mode: row.mode || event.mode || 'online',
+          location: event.location || 'rvce',
+          studentType: event.studentType || null,
+          subtypes: [stageName],
+          date: row.date,
+          desc: event.desc
+        };
+
+        const postRes = await fetch(`${API}/api/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(newEvent)
+        });
+
+        if (!postRes.ok) {
+          let errData = {};
+          try { errData = await postRes.json(); } catch(e) {}
+          throw new Error(errData.detail || `Failed to schedule ${stageName} on ${row.date}.`);
+        }
+      }
+
+      // Handle TBD event retention/update
+      if (isTbd) {
+        const keepTbdCheckbox = document.getElementById('schedule-keep-tbd');
+        const shouldKeepInTbd = keepTbdCheckbox ? keepTbdCheckbox.checked : true;
+
+        if (shouldKeepInTbd) {
+          const scheduledLower = scheduledRoundNames.map(s => s.toLowerCase());
+          const remainingSubtypes = (event.subtypes || []).filter(
+            s => !scheduledLower.includes(String(s).trim().toLowerCase())
+          );
+
+          await fetch(`${API}/api/events`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+              ...event,
+              subtypes: remainingSubtypes
+            })
+          });
+        } else {
+          await fetch(`${API}/api/events`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ id: event.id })
+          });
+        }
+      }
+
       await fetchEvents();
       hideEventModal();
       generateCalendarGrid();
       renderTbdDrives();
       renderAgendaList();
     } catch (err) {
-      alert(err.message || 'Failed to schedule event.');
+      if (errorEl) {
+        errorEl.textContent = err.message || 'Failed to schedule event.';
+        errorEl.style.display = 'block';
+      } else {
+        alert(err.message || 'Failed to schedule event.');
+      }
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Confirm Date & Schedule';
+      renderRows();
     }
   });
 }
+
 
 // 5. Generate Main Calendar Grid
 function generateCalendarGrid() {
@@ -1159,7 +1509,14 @@ function generateCalendarGrid() {
 
       cellContent += `<div class="day-events">`;
       visibleEvents.forEach(ev => {
-        cellContent += `<div class="calendar-event-pill event-${ev.type}" data-event-id="${ev.id}"><span class="event-dot"></span><span class="event-text">${escapeHTML(ev.title)}</span></div>`;
+        let stageLabel = '';
+        if (ev.subtypes && Array.isArray(ev.subtypes) && ev.subtypes.length === 1) {
+          const st = String(ev.subtypes[0]).trim();
+          if (st && !ev.title.toLowerCase().includes(st.toLowerCase())) {
+            stageLabel = ` (${st})`;
+          }
+        }
+        cellContent += `<div class="calendar-event-pill event-${ev.type}" data-event-id="${ev.id}"><span class="event-dot"></span><span class="event-text">${escapeHTML(ev.title)}${escapeHTML(stageLabel)}</span></div>`;
       });
       if (extraCount > 0) {
         cellContent += `<div class="calendar-event-more">+${extraCount} more</div>`;
@@ -1490,7 +1847,10 @@ function showEventDetailModalVisitor(event) {
     </div>
     <h3 class="modal-title">${escapeHTML(event.title)}</h3>
     <div class="modal-date">${dateStr}</div>
-    <div class="modal-desc" style="margin-bottom: 20px;">${formatEventDescription(event.desc)}</div>
+    <div class="modal-desc">${formatEventDescription(event.desc)}</div>
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="hideEventModal()">Close</button>
+    </div>
   `;
   modal.classList.add('active');
 }
@@ -1539,16 +1899,23 @@ function showEventDetailModalAdmin(event) {
     <div class="modal-date">${dateStr}</div>
     <div class="modal-desc">${formatEventDescription(event.desc)}</div>
     <div class="modal-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-      ${isTbd ? `<button class="modal-btn schedule-btn" id="modal-schedule-btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 600;">📅 Confirm Date</button>` : ''}
+      ${isTbd 
+        ? `<button class="modal-btn schedule-btn" id="modal-schedule-btn" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 600;">📅 Set Date / Schedule Rounds</button>` 
+        : `<button class="modal-btn schedule-btn" id="modal-schedule-next-round-btn" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border: none; font-weight: 600;">📅 Schedule Another Round</button>`
+      }
       <button class="modal-btn edit-btn" id="modal-edit-btn">Edit Update</button>
       <button class="modal-btn delete-btn" id="modal-delete-btn">Delete Update</button>
     </div>
   `;
   modal.classList.add('active');
   
-  // Set Date click
+  // Set Date / Schedule Rounds click
   if (isTbd) {
     document.getElementById('modal-schedule-btn')?.addEventListener('click', () => {
+      showScheduleDateModal(event);
+    });
+  } else {
+    document.getElementById('modal-schedule-next-round-btn')?.addEventListener('click', () => {
       showScheduleDateModal(event);
     });
   }
