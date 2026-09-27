@@ -667,40 +667,9 @@ function renderCalendar(container) {
         </div>
       </div>
 
-      <!-- Mobile Navigation Tabs (Segmented Control on screens <= 768px) -->
-      <div class="calendar-mobile-nav" id="calendar-mobile-nav">
-        <button type="button" class="mobile-nav-btn active" id="btn-tab-calendar" data-tab="calendar">
-          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          <span>Calendar</span>
-        </button>
-        <button type="button" class="mobile-nav-btn" id="btn-tab-tbd" data-tab="tbd">
-          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <span>Upcoming Drives</span>
-          <span class="mobile-nav-badge" id="mobile-tbd-count-badge">0 TBD</span>
-        </button>
-      </div>
-
-      <div class="calendar-workspace mobile-view-calendar" id="calendar-workspace">
+      <div class="calendar-workspace">
         <!-- Left Sidebar -->
         <aside class="calendar-sidebar">
-          <div class="mobile-sidebar-header-bar">
-            <button type="button" class="tbd-mobile-back-to-cal" id="btn-back-to-calendar">
-              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.2" fill="none">
-                <line x1="19" y1="12" x2="5" y2="12"/>
-                <polyline points="12 19 5 12 12 5"/>
-              </svg>
-              <span>Back to Calendar</span>
-            </button>
-          </div>
-
           <!-- TBD Upcoming Drives Pipeline -->
           <div class="calendar-tbd-section" id="calendar-tbd-section">
             <!-- Populated dynamically by renderTbdDrives() -->
@@ -748,58 +717,6 @@ function renderCalendar(container) {
 
         <!-- Main Calendar Desk -->
         <main class="calendar-main">
-          <!-- Mobile Quick TBD Alert Banner -->
-          <div class="calendar-mobile-tbd-banner" id="mobile-tbd-quick-banner" style="display: none;">
-            <div class="mobile-tbd-banner-left">
-              <span class="mobile-tbd-banner-icon">⏳</span>
-              <span class="mobile-tbd-banner-text"><strong id="mobile-tbd-quick-count">0</strong> unconfirmed company drives pending</span>
-            </div>
-            <button type="button" class="mobile-tbd-banner-btn" id="btn-view-tbd-pipeline">
-              View Drives →
-            </button>
-          </div>
-
-          <!-- Mobile Collapsible Filter Bar -->
-          <div class="calendar-mobile-filter-bar">
-            <button type="button" class="btn-mobile-filter-toggle" id="btn-mobile-filter-toggle">
-              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.2" fill="none"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-              <span>Filter Categories</span>
-              <span class="filter-chevron" id="mobile-filter-chevron">▾</span>
-            </button>
-          </div>
-          <div class="calendar-mobile-filter-drawer" id="mobile-filter-drawer" style="display: none;">
-            <div class="mobile-filter-chips">
-              <label class="mobile-filter-chip">
-                <input type="checkbox" id="m-filter-exams" ${calendarFilters.exams ? 'checked' : ''}>
-                <span class="chip-label">Interviews</span>
-              </label>
-              <label class="mobile-filter-chip">
-                <input type="checkbox" id="m-filter-holidays" ${calendarFilters.holidays ? 'checked' : ''}>
-                <span class="chip-label">Holidays</span>
-              </label>
-              <label class="mobile-filter-chip">
-                <input type="checkbox" id="m-filter-online" ${calendarFilters.online ? 'checked' : ''}>
-                <span class="chip-label">Online</span>
-              </label>
-              <label class="mobile-filter-chip">
-                <input type="checkbox" id="m-filter-offline" ${calendarFilters.offline ? 'checked' : ''}>
-                <span class="chip-label">Offline</span>
-              </label>
-              <label class="mobile-filter-chip">
-                <input type="checkbox" id="m-filter-oncampus" ${calendarFilters.oncampus ? 'checked' : ''}>
-                <span class="chip-label">RVCE</span>
-              </label>
-              <label class="mobile-filter-chip">
-                <input type="checkbox" id="m-filter-offcampus" ${calendarFilters.offcampus ? 'checked' : ''}>
-                <span class="chip-label">RVITM</span>
-              </label>
-              <label class="mobile-filter-chip">
-                <input type="checkbox" id="m-filter-worksite" ${calendarFilters.worksite ? 'checked' : ''}>
-                <span class="chip-label">Worksite</span>
-              </label>
-            </div>
-          </div>
-
           <div class="calendar-toolbar">
             <div class="toolbar-left">
               <button class="toolbar-btn today-btn" id="cal-today-btn">Today</button>
@@ -900,61 +817,6 @@ function renderCalendar(container) {
   ['exams', 'holidays', 'online', 'offline', 'oncampus', 'offcampus', 'worksite'].forEach(key => {
     document.getElementById(`filter-${key}`)?.addEventListener('change', (e) => {
       calendarFilters[key] = e.target.checked;
-      const mInput = document.getElementById(`m-filter-${key}`);
-      if (mInput) mInput.checked = e.target.checked;
-      generateCalendarGrid();
-      renderAgendaList();
-      renderTbdDrives();
-    });
-  });
-
-  // Mobile navigation tabs & drawer listeners
-  const workspace = document.getElementById('calendar-workspace');
-  const tabCal = document.getElementById('btn-tab-calendar');
-  const tabTbd = document.getElementById('btn-tab-tbd');
-  const bannerBtn = document.getElementById('btn-view-tbd-pipeline');
-  const backToCalBtn = document.getElementById('btn-back-to-calendar');
-
-  const switchMobileView = (targetView) => {
-    if (targetView === 'calendar') {
-      workspace?.classList.remove('mobile-view-tbd');
-      workspace?.classList.add('mobile-view-calendar');
-      tabCal?.classList.add('active');
-      tabTbd?.classList.remove('active');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      workspace?.classList.remove('mobile-view-calendar');
-      workspace?.classList.add('mobile-view-tbd');
-      tabCal?.classList.remove('active');
-      tabTbd?.classList.add('active');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  tabCal?.addEventListener('click', () => switchMobileView('calendar'));
-  tabTbd?.addEventListener('click', () => switchMobileView('tbd'));
-  bannerBtn?.addEventListener('click', () => switchMobileView('tbd'));
-  backToCalBtn?.addEventListener('click', () => switchMobileView('calendar'));
-
-  // Mobile filter drawer toggle
-  const filterToggleBtn = document.getElementById('btn-mobile-filter-toggle');
-  const filterDrawer = document.getElementById('mobile-filter-drawer');
-  const filterChevron = document.getElementById('mobile-filter-chevron');
-
-  filterToggleBtn?.addEventListener('click', () => {
-    if (!filterDrawer) return;
-    const isHidden = filterDrawer.style.display === 'none';
-    filterDrawer.style.display = isHidden ? 'block' : 'none';
-    if (filterChevron) filterChevron.textContent = isHidden ? '▴' : '▾';
-  });
-
-  // Mobile filter inputs sync
-  ['exams', 'holidays', 'online', 'offline', 'oncampus', 'offcampus', 'worksite'].forEach(key => {
-    const mInput = document.getElementById(`m-filter-${key}`);
-    const sInput = document.getElementById(`filter-${key}`);
-    mInput?.addEventListener('change', (e) => {
-      calendarFilters[key] = e.target.checked;
-      if (sInput) sInput.checked = e.target.checked;
       generateCalendarGrid();
       renderAgendaList();
       renderTbdDrives();
@@ -1007,20 +869,6 @@ function renderTbdDrives() {
     if (isWorksite && !calendarFilters.worksite) return false;
     return true;
   });
-
-  // Update mobile tab badges
-  const mobileTabBadge = document.getElementById('mobile-tbd-count-badge');
-  if (mobileTabBadge) {
-    mobileTabBadge.textContent = `${tbdEvents.length} TBD`;
-  }
-  const mobileQuickCount = document.getElementById('mobile-tbd-quick-count');
-  if (mobileQuickCount) {
-    mobileQuickCount.textContent = tbdEvents.length;
-  }
-  const mobileBanner = document.getElementById('mobile-tbd-quick-banner');
-  if (mobileBanner) {
-    mobileBanner.style.display = tbdEvents.length > 0 ? 'flex' : 'none';
-  }
 
   let html = `
     <div class="tbd-section-header">
