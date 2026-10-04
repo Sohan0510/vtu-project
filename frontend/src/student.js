@@ -855,16 +855,6 @@ function renderCalendar(container) {
     generateCalendarGrid();
   });
 
-  // Admin toolbar add event button
-  if (isAdmin) {
-    document.getElementById('cal-toolbar-add-btn')?.addEventListener('click', () => {
-      const selYear = selectedCalendarDate.getFullYear();
-      const selMonth = selectedCalendarDate.getMonth();
-      const selDay = selectedCalendarDate.getDate();
-      const dateStr = `${selYear}-${String(selMonth + 1).padStart(2, '0')}-${String(selDay).padStart(2, '0')}`;
-      showCreateEventModal(dateStr);
-    });
-  }
 
   // Bind back button
   document.getElementById('calendar-back').addEventListener('click', () => {
