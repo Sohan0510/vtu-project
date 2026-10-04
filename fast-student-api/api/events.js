@@ -65,6 +65,69 @@ const getGoogleAuth = () => {
   }
 };
 
+// Clean text and remove markdown asterisks/stars and headings
+function cleanTitle(title) {
+  if (!title) return '';
+  return String(title).replace(/[\*_~#]/g, '').trim();
+}
+
+// Clean and format description specifically for Google Calendar
+// Removes raw markdown symbols (like * and **) while preserving clean bullets and structure
+function formatGoogleCalendarDescription(desc, metadata = {}) {
+  if (!desc) desc = '';
+  
+  const lines = String(desc).split(/\r?\n/);
+  const cleanedLines = lines.map(line => {
+    let l = line.trim();
+    if (!l) return '';
+    
+    // Replace leading markdown bullets (*, -, +) with clean unicode bullet •
+    l = l.replace(/^[\*\-\+•]\s*/, '• ');
+    
+    // Remove bold and italic markdown asterisks and underscores:
+    // e.g. ***text***, **text**, *text*, ___text___, __text__, _text_
+    l = l.replace(/\*{2,3}(.+?)\*{2,3}/g, '$1');
+    l = l.replace(/_{2,3}(.+?)_{2,3}/g, '$1');
+    l = l.replace(/(^|[^\*])\*([^\*]+?)\*([^\*]|$)/g, '$1$2$3');
+    l = l.replace(/(^|[^_])_([^_]+?)_([^_]|$)/g, '$1$2$3');
+    
+    // Remove any remaining stray asterisks
+    l = l.replace(/\*{1,3}/g, '');
+    
+    // Convert markdown links [text](url) -> text: url
+    l = l.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1: $2');
+    
+    // Remove markdown header markers (e.g. ### Header)
+    l = l.replace(/^#{1,6}\s+/, '');
+    
+    return l;
+  });
+
+  let result = cleanedLines.join('\n').trim();
+
+  // Append clean metadata
+  const metaParts = [];
+  if (metadata.type) {
+    const typeLabel = metadata.type === 'exams' ? 'exams' : (metadata.type === 'holidays' ? 'holidays' : metadata.type);
+    metaParts.push(`Type: ${typeLabel}`);
+  }
+  if (metadata.mode) {
+    metaParts.push(`Mode: ${metadata.mode}`);
+  }
+  if (metadata.location) {
+    metaParts.push(`Location: ${metadata.location}`);
+  }
+  if (metadata.studentType) {
+    metaParts.push(`Target: ${metadata.studentType}`);
+  }
+
+  if (metaParts.length > 0) {
+    result += (result ? '\n\n' : '') + metaParts.join('\n');
+  }
+
+  return result;
+}
+
 module.exports = async function (req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -109,8 +172,56 @@ module.exports = async function (req, res) {
       return res.status(401).json({ detail: 'Unauthorized. Invalid or missing admin token.' });
     }
 
-    // POST /api/events - Create new event
+    // POST /api/events - Create new event or handle admin actions
     if (req.method === 'POST') {
+      // Optional admin action: resync existing Google Calendar events with clean descriptions
+      if (req.body && req.body.action === 'resync_gcal') {
+        const calendarId = process.env.GOOGLE_CALENDAR_ID;
+        const auth = getGoogleAuth();
+        if (!auth || !calendarId) {
+          return res.status(400).json({ detail: 'Google Calendar credentials not configured.' });
+        }
+        try {
+          const calendar = google.calendar({ version: 'v3', auth });
+          const eventsWithGCal = await collection.find({ googleEventId: { $ne: null } }).toArray();
+          let updatedCount = 0;
+          for (const ev of eventsWithGCal) {
+            if (!ev.date || ev.date.trim().toUpperCase() === 'TBD') continue;
+            try {
+              const eventDate = new Date(ev.date);
+              const nextDay = new Date(eventDate);
+              nextDay.setDate(nextDay.getDate() + 1);
+              const nextDayStr = nextDay.toISOString().split('T')[0];
+
+              const gCalEvent = {
+                summary: cleanTitle(ev.title),
+                description: formatGoogleCalendarDescription(ev.desc, {
+                  type: ev.type,
+                  mode: ev.mode,
+                  location: ev.location,
+                  studentType: ev.studentType
+                }),
+                start: { date: ev.date },
+                end: { date: nextDayStr },
+              };
+
+              await calendar.events.update({
+                calendarId: calendarId,
+                eventId: ev.googleEventId,
+                resource: gCalEvent,
+              });
+              updatedCount++;
+            } catch (err) {
+              console.error(`Failed to update gCal event ${ev.id}:`, err.message);
+            }
+          }
+          return res.status(200).json({ detail: `Successfully updated ${updatedCount} Google Calendar events with clean descriptions.` });
+        } catch (err) {
+          console.error("Google Calendar Resync Error:", err);
+          return res.status(500).json({ detail: 'Failed to resync Google Calendar events.' });
+        }
+      }
+
       const { id, title, type, mode, location, studentType, subtypes, date, desc } = req.body || {};
       
       // Strict type checking to prevent NoSQL injection
@@ -132,8 +243,13 @@ module.exports = async function (req, res) {
           const nextDayStr = nextDay.toISOString().split('T')[0];
           
           const gCalEvent = {
-            summary: title,
-            description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : '') + (studentType ? `\nTarget: ${studentType}` : ''),
+            summary: cleanTitle(title),
+            description: formatGoogleCalendarDescription(desc, {
+              type,
+              mode,
+              location,
+              studentType
+            }),
             start: { date: date }, // all-day event format
             end: { date: nextDayStr }, // exclusive end date
           };
@@ -206,8 +322,13 @@ module.exports = async function (req, res) {
             const nextDayStr = nextDay.toISOString().split('T')[0];
             
             const gCalEvent = {
-              summary: title,
-              description: desc + `\n\nType: ${type}` + (mode ? `\nMode: ${mode}` : '') + (location ? `\nLocation: ${location}` : '') + (studentType ? `\nTarget: ${studentType}` : ''),
+              summary: cleanTitle(title),
+              description: formatGoogleCalendarDescription(desc, {
+                type,
+                mode,
+                location,
+                studentType
+              }),
               start: { date: date },
               end: { date: nextDayStr },
             };

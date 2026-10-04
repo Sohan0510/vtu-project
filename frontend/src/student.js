@@ -56,11 +56,25 @@ function formatEventDescription(desc) {
     // Markdown italic: *text* or _text_
     escaped = escaped.replace(/(^|[^\*])\*([^\*]+?)\*([^\*]|$)/g, '$1<em>$2</em>$3');
     escaped = escaped.replace(/(^|[^_])_([^_]+?)_([^_]|$)/g, '$1<em>$2</em>$3');
+
+    // Remove any leftover stray asterisks
+    escaped = escaped.replace(/\*{1,3}/g, '');
+
+    // Auto-bold key in "Key: Value" if not already bolded
+    if (!escaped.includes('<strong>')) {
+      escaped = escaped.replace(/^([A-Za-z0-9\s/&()–-]+?):(\s+|$)/, '<strong>$1:</strong>$2');
+    }
     
-    // Clickable URLs: http:// or https://
+    // Convert markdown links: [Label](url)
     escaped = escaped.replace(
-      /(https?:\/\/[^\s<]+)/g,
-      '<a href="$1" target="_blank" rel="noopener noreferrer" class="desc-link">$1</a>'
+      /\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="desc-link">$1</a>'
+    );
+
+    // Clickable URLs: http:// or https:// (not inside an already created href)
+    escaped = escaped.replace(
+      /(^|[^">])(https?:\/\/[^\s<]+)/g,
+      '$1<a href="$2" target="_blank" rel="noopener noreferrer" class="desc-link">$2</a>'
     );
     
     return escaped;
@@ -68,8 +82,8 @@ function formatEventDescription(desc) {
   
   for (let line of lines) {
     const trimmed = line.trim();
-    // Match bullet points starting with -, *, +, or • followed by one or more spaces
-    const listMatch = trimmed.match(/^([-\*\+•])\s+(.+)$/);
+    // Match bullet points starting with -, *, +, or • followed by optional spaces
+    const listMatch = trimmed.match(/^([-\*\+•])\s*(.+)$/);
     
     if (listMatch) {
       if (!inList) {
@@ -783,7 +797,16 @@ function renderCalendar(container) {
                 </button>
               </div>
             </div>
-            <div class="toolbar-subscribe">
+            <div class="toolbar-subscribe" style="display: flex; gap: 8px; align-items: center;">
+              ${isAdmin ? `
+                <button class="toolbar-btn btn-add-event" id="cal-toolbar-add-btn" style="background: var(--gold-satin, #b45309); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px; font-weight: 600;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Add Event
+                </button>
+              ` : ''}
               <button onclick="showSubscribeModal()" class="toolbar-btn btn-subscribe-cal" style="background: #4285F4; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 10H21" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H12.01" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Subscribe
@@ -840,6 +863,17 @@ function renderCalendar(container) {
     calendarInitialLoad = true;
     generateCalendarGrid();
   });
+
+  // Admin toolbar add event button
+  if (isAdmin) {
+    document.getElementById('cal-toolbar-add-btn')?.addEventListener('click', () => {
+      const selYear = selectedCalendarDate.getFullYear();
+      const selMonth = selectedCalendarDate.getMonth();
+      const selDay = selectedCalendarDate.getDate();
+      const dateStr = `${selYear}-${String(selMonth + 1).padStart(2, '0')}-${String(selDay).padStart(2, '0')}`;
+      showCreateEventModal(dateStr);
+    });
+  }
 
   // Bind back button
   document.getElementById('calendar-back').addEventListener('click', () => {
@@ -1593,18 +1627,12 @@ function generateCalendarGrid() {
       selectedCalendarDate = new Date(year, month, d);
       generateCalendarGrid();
 
-      // Auto-scroll down to the agenda view where events are shown
+      // Auto-scroll smoothly down to the agenda view where events are shown
       const agendaView = document.getElementById('calendar-agenda-view');
       if (agendaView) {
         setTimeout(() => {
           agendaView.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      }
-
-      // Only show the direct create modal if Admin and on desktop (width > 768px)
-      // Mobile admins will use the "Add Update" button inside the Agenda view
-      if (isAdmin && window.innerWidth > 768) {
-        showCreateEventModal(dateStr);
+        }, 50);
       }
     });
   }
@@ -1697,7 +1725,7 @@ function renderAgendaList() {
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg> Add Update
+            </svg> Add Event
           </button>
           <button class="agenda-add-btn" id="agenda-ai-post-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; border: none; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.25);">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px;">
@@ -1718,7 +1746,7 @@ function renderAgendaList() {
           <line x1="12" y1="8" x2="12" y2="12"/>
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
-        <span>No placement events or activities scheduled.</span>
+        <span>No events scheduled for this date.</span>
       </div>
     `;
   } else {
