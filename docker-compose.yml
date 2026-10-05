@@ -27,3 +27,20 @@ services:
       - backend
     restart: unless-stopped
 
+  whatsapp-bot:
+    build:
+      context: ./whatsapp-bot
+      dockerfile: Dockerfile
+    container_name: vtu_whatsapp_bot
+    depends_on:
+      - backend
+    volumes:
+      - ./whatsapp-bot/auth_session:/app/auth_session
+    environment:
+      - API_BASE_URL=http://backend:8000
+      - ALLOWED_GROUPS=${ALLOWED_GROUPS:-*}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ADMIN_ID=${ADMIN_ID:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - DRY_RUN=${DRY_RUN:-false}
+    restart: unless-stopped

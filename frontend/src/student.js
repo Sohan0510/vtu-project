@@ -3251,7 +3251,7 @@ function showSPCPasswordModal() {
     // Hash password using sha256 helper
     const pwHash = await sha256(password);
     
-    // Compare hashes (spc@5 or spc%405)
+    // Validate hash against authorization key
     if (pwHash === '959bb004eb614b51840f0754e29012b627dae2bbb42232bf1751b578a1d6176b' || 
         pwHash === '74ffa579c6aa545cdcbc5faf5fbfa3c889ee6aa669dd2245e35b64536a2c2c76') {
       hideEventModal();

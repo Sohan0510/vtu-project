@@ -1,7 +1,42 @@
+# Virtual Environments
 venv/
-temp/
-.env
+.venv/
+env/
+
+# Python cache & artifacts
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary & Export Directories
+temp/
 exports/
 compare.html
 url_usage_report.py
+
+# Environment variables & secrets (defense-in-depth)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Authentication credentials & sessions (e.g. WhatsApp Baileys)
+auth_session/
+**/auth_session/
+**/auth_session/**
+*.key
+*.pem
+*.pfx
+*.p12
+
+# Node & Frontend dependencies & builds
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# OS generated files
+.DS_Store
+Thumbs.db

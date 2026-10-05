@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { CONFIG } from './config.js';
 import { isPlacementDriveMessage } from './filter.js';
 import { PlacementApiClient } from './api-client.js';
 import { reconcileWithCOE } from './reconciler.js';
