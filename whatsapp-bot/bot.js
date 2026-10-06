@@ -16,27 +16,114 @@ const client = new PlacementApiClient();
 const AUTH_DIR = path.resolve(process.cwd(), 'auth_session');
 
 let botStatus = 'starting';
+let currentQr = null;
 
-// Start Render Healthcheck HTTP Server (prevents deploy timeout & enables 24/7 keep-alive)
+// Start Render Healthcheck & QR Code Web Server
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
-  if (req.url === '/health' || req.url === '/') {
+  if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
+    return res.end(JSON.stringify({
       status: 'online',
       service: 'vtu-whatsapp-bot',
       botStatus,
       allowedGroups: CONFIG.ALLOWED_GROUPS,
       uptimeSeconds: Math.floor(process.uptime())
     }));
-  } else {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
   }
+
+  // Web page displaying the QR code or connection status
+  if (req.url === '/qr' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+
+    if (botStatus === 'connected') {
+      return res.end(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>WhatsApp Bot Connected</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
+            .card { background: #1e293b; padding: 40px; border-radius: 16px; text-align: center; border: 1px solid #334155; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+            h1 { color: #22c55e; margin: 0 0 10px 0; font-size: 24px; }
+            p { color: #94a3b8; font-size: 14px; margin: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>✅ Connected to WhatsApp!</h1>
+            <p>The placement bot is online and actively listening for announcements in configured groups.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    if (!currentQr) {
+      return res.end(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Generating QR Code...</title>
+          <meta http-equiv="refresh" content="3">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
+            .card { background: #1e293b; padding: 40px; border-radius: 16px; text-align: center; border: 1px solid #334155; max-width: 400px; }
+            h2 { color: #38bdf8; margin: 0 0 10px 0; }
+            p { color: #94a3b8; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>⏳ Generating QR Code...</h2>
+            <p>Please wait a few seconds. This page refreshes automatically.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(currentQr)}`;
+    return res.end(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Scan WhatsApp QR Code</title>
+        <meta http-equiv="refresh" content="20">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
+          .card { background: #1e293b; padding: 32px; border-radius: 16px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 420px; }
+          h2 { color: #38bdf8; margin: 0 0 8px 0; font-size: 22px; }
+          p { color: #94a3b8; font-size: 14px; margin: 4px 0 16px 0; }
+          .qr-box { background: white; padding: 16px; border-radius: 12px; display: inline-block; margin-bottom: 16px; }
+          .qr-box img { display: block; max-width: 100%; height: auto; }
+          .footer { font-size: 12px; color: #64748b; margin-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>📱 Scan with WhatsApp</h2>
+          <p>WhatsApp &rarr; <b>Linked Devices</b> &rarr; <b>Link a Device</b></p>
+          <div class="qr-box">
+            <img src="${qrImgUrl}" alt="WhatsApp QR Code" width="300" height="300" />
+          </div>
+          <div class="footer">Auto-refreshes every 20 seconds. Once scanned, bot remains connected.</div>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
+  res.end('Not Found');
 });
 
 server.listen(PORT, () => {
   console.log(`🌐 Healthcheck HTTP server listening on port ${PORT}`);
+  console.log(`📲 Open your Render URL in browser to scan QR code cleanly without terminal distortions!`);
 });
 
 async function startWhatsAppBot() {
@@ -65,6 +152,7 @@ async function startWhatsAppBot() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      currentQr = qr;
       botStatus = 'waiting_for_qr_scan';
       console.log('\n📲 SCAN THIS QR CODE WITH WHATSAPP ON YOUR PHONE:');
       console.log('(Settings → Linked Devices → Link a Device)\n');
@@ -84,6 +172,7 @@ async function startWhatsAppBot() {
         console.log('❌ Logged out of WhatsApp. Delete auth_session folder to re-scan QR code.');
       }
     } else if (connection === 'open') {
+      currentQr = null;
       botStatus = 'connected';
       console.log('\n✅ CONNECTED TO WHATSAPP!');
       console.log('🤖 Listening for placement announcements in configured groups...\n');
