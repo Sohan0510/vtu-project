@@ -1,4 +1,5 @@
 import http from 'http';
+import QRCode from 'qrcode';
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
@@ -17,10 +18,12 @@ const AUTH_DIR = path.resolve(process.cwd(), 'auth_session');
 
 let botStatus = 'starting';
 let currentQr = null;
+let currentQrPngBuffer = null;
+let currentQrDataUrl = null;
 
-// Start Render Healthcheck & QR Code Web Server
+// Start Render Healthcheck & Native PNG QR Code Web Server
 const PORT = process.env.PORT || 3000;
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
@@ -32,7 +35,21 @@ const server = http.createServer((req, res) => {
     }));
   }
 
-  // Web page displaying the QR code or connection status
+  // Pure PNG image endpoint
+  if (req.url === '/qr.png') {
+    if (currentQrPngBuffer) {
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      });
+      return res.end(currentQrPngBuffer);
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end(botStatus === 'connected' ? 'WhatsApp Bot is already connected!' : 'QR Code not yet ready, please wait...');
+    }
+  }
+
+  // Web page displaying the actual PNG QR code or connection status
   if (req.url === '/qr' || req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 
@@ -60,7 +77,7 @@ const server = http.createServer((req, res) => {
       `);
     }
 
-    if (!currentQr) {
+    if (!currentQrDataUrl) {
       return res.end(`
         <!DOCTYPE html>
         <html>
@@ -85,7 +102,6 @@ const server = http.createServer((req, res) => {
       `);
     }
 
-    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(currentQr)}`;
     return res.end(`
       <!DOCTYPE html>
       <html>
@@ -98,9 +114,11 @@ const server = http.createServer((req, res) => {
           .card { background: #1e293b; padding: 32px; border-radius: 16px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 420px; }
           h2 { color: #38bdf8; margin: 0 0 8px 0; font-size: 22px; }
           p { color: #94a3b8; font-size: 14px; margin: 4px 0 16px 0; }
-          .qr-box { background: white; padding: 16px; border-radius: 12px; display: inline-block; margin-bottom: 16px; }
-          .qr-box img { display: block; max-width: 100%; height: auto; }
-          .footer { font-size: 12px; color: #64748b; margin-top: 10px; }
+          .qr-box { background: white; padding: 12px; border-radius: 12px; display: inline-block; margin-bottom: 12px; }
+          .qr-box img { display: block; max-width: 100%; height: auto; border-radius: 6px; }
+          .btn-link { display: inline-block; color: #38bdf8; text-decoration: none; font-size: 13px; font-weight: 500; margin-top: 8px; }
+          .btn-link:hover { text-decoration: underline; }
+          .footer { font-size: 12px; color: #64748b; margin-top: 12px; }
         </style>
       </head>
       <body>
@@ -108,7 +126,10 @@ const server = http.createServer((req, res) => {
           <h2>📱 Scan with WhatsApp</h2>
           <p>WhatsApp &rarr; <b>Linked Devices</b> &rarr; <b>Link a Device</b></p>
           <div class="qr-box">
-            <img src="${qrImgUrl}" alt="WhatsApp QR Code" width="300" height="300" />
+            <img src="${currentQrDataUrl}" alt="WhatsApp QR Code PNG" width="300" height="300" />
+          </div>
+          <div>
+            <a class="btn-link" href="/qr.png" target="_blank">&#x2922; Open Pure PNG in New Tab</a>
           </div>
           <div class="footer">Auto-refreshes every 20 seconds. Once scanned, bot remains connected.</div>
         </div>
@@ -123,7 +144,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`🌐 Healthcheck HTTP server listening on port ${PORT}`);
-  console.log(`📲 Open your Render URL in browser to scan QR code cleanly without terminal distortions!`);
+  console.log(`📲 Open your Render URL (or /qr.png) in browser to scan crisp PNG QR code!`);
 });
 
 async function startWhatsAppBot() {
@@ -153,11 +174,21 @@ async function startWhatsAppBot() {
 
     if (qr) {
       currentQr = qr;
+      try {
+        currentQrPngBuffer = await QRCode.toBuffer(qr, {
+          scale: 8,
+          margin: 3,
+          errorCorrectionLevel: 'M'
+        });
+        currentQrDataUrl = `data:image/png;base64,${currentQrPngBuffer.toString('base64')}`;
+      } catch (err) {
+        console.error('Failed to generate PNG QR:', err.message);
+      }
+
       botStatus = 'waiting_for_qr_scan';
-      console.log('\n📲 SCAN THIS QR CODE WITH WHATSAPP ON YOUR PHONE:');
-      console.log('(Settings → Linked Devices → Link a Device)\n');
+      console.log('\n📲 QR CODE READY AS PNG:');
+      console.log('View clean PNG image in your browser at: /qr or /qr.png\n');
       qrcode.generate(qr, { small: true });
-      console.log('Waiting for scan...\n');
     }
 
     if (connection === 'close') {
@@ -173,6 +204,8 @@ async function startWhatsAppBot() {
       }
     } else if (connection === 'open') {
       currentQr = null;
+      currentQrPngBuffer = null;
+      currentQrDataUrl = null;
       botStatus = 'connected';
       console.log('\n✅ CONNECTED TO WHATSAPP!');
       console.log('🤖 Listening for placement announcements in configured groups...\n');
