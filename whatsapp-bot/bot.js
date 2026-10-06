@@ -1,3 +1,4 @@
+import http from 'http';
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
@@ -13,6 +14,30 @@ import { reconcileWithCOE } from './reconciler.js';
 
 const client = new PlacementApiClient();
 const AUTH_DIR = path.resolve(process.cwd(), 'auth_session');
+
+let botStatus = 'starting';
+
+// Start Render Healthcheck HTTP Server (prevents deploy timeout & enables 24/7 keep-alive)
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'online',
+      service: 'vtu-whatsapp-bot',
+      botStatus,
+      allowedGroups: CONFIG.ALLOWED_GROUPS,
+      uptimeSeconds: Math.floor(process.uptime())
+    }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`🌐 Healthcheck HTTP server listening on port ${PORT}`);
+});
 
 async function startWhatsAppBot() {
   console.log('====================================================');
@@ -40,6 +65,7 @@ async function startWhatsAppBot() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      botStatus = 'waiting_for_qr_scan';
       console.log('\n📲 SCAN THIS QR CODE WITH WHATSAPP ON YOUR PHONE:');
       console.log('(Settings → Linked Devices → Link a Device)\n');
       qrcode.generate(qr, { small: true });
@@ -47,15 +73,18 @@ async function startWhatsAppBot() {
     }
 
     if (connection === 'close') {
+      botStatus = 'reconnecting';
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       console.log(`\n⚠️ Connection closed (Status: ${statusCode}). Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
         setTimeout(startWhatsAppBot, 3000);
       } else {
+        botStatus = 'logged_out';
         console.log('❌ Logged out of WhatsApp. Delete auth_session folder to re-scan QR code.');
       }
     } else if (connection === 'open') {
+      botStatus = 'connected';
       console.log('\n✅ CONNECTED TO WHATSAPP!');
       console.log('🤖 Listening for placement announcements in configured groups...\n');
     }
