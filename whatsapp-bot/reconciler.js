@@ -35,6 +35,7 @@ function textSimilarity(strA, strB) {
  */
 export function reconcileWithCOE(newEvents, existingEvents = []) {
   const plan = [];
+  const claimedTbdIds = new Set();
   const existingMax = existingEvents.reduce((max, e) => Math.max(max, Number(e.id) || 0), 0);
   let highestId = existingMax > 0 ? existingMax : 1000;
 
@@ -90,8 +91,9 @@ export function reconcileWithCOE(newEvents, existingEvents = []) {
 
     // 2. Check for TBD -> Confirmed Date Promotion
     // If an existing event for this company is on 'TBD' and the new announcement provides a confirmed date
-    const tbdMatch = companyMatches.find(e => !e.date || e.date.trim().toUpperCase() === 'TBD');
+    const tbdMatch = companyMatches.find(e => (!e.date || e.date.trim().toUpperCase() === 'TBD') && !claimedTbdIds.has(e.id));
     if (tbdMatch && newEv.date && newEv.date.trim().toUpperCase() !== 'TBD') {
+      claimedTbdIds.add(tbdMatch.id);
       plan.push({
         action: 'PROMOTE_TBD_TO_CONFIRMED',
         targetId: tbdMatch.id,

@@ -91,6 +91,16 @@ export class PlacementApiClient {
    * falls back directly to Gemini AI using GEMINI_API_KEY from .env.
    */
   async parseAnnouncement(text) {
+    // 1. Direct Gemini parsing with enhanced multi-event & deadline sanitization
+    if (this.geminiApiKey) {
+      try {
+        return await parseWithGeminiDirect(text, this.geminiApiKey);
+      } catch (geminiErr) {
+        console.warn(`[PlacementApiClient] Direct Gemini parse error: ${geminiErr.message}. Trying backend API...`);
+      }
+    }
+
+    // 2. Fallback to backend API (/api/parse or /api/ai/parse)
     try {
       const headers = await this.getHeaders();
       let parseUrl = `${this.baseUrl}/api/parse`;
@@ -101,7 +111,6 @@ export class PlacementApiClient {
       });
 
       if (!res.ok && res.status === 404) {
-        // Try FastAPI endpoint name
         parseUrl = `${this.baseUrl}/api/ai/parse`;
         res = await fetch(parseUrl, {
           method: 'POST',
@@ -116,11 +125,10 @@ export class PlacementApiClient {
         if (data && Array.isArray(data.events)) return data.events;
       }
     } catch (apiErr) {
-      // Fall through to direct Gemini call
+      console.error(`[PlacementApiClient] Backend parse API error:`, apiErr.message);
     }
 
-    // Direct Gemini fallback using existing GEMINI_API_KEY
-    return await parseWithGeminiDirect(text, this.geminiApiKey);
+    return [];
   }
 
   async getEvents() {
