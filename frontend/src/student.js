@@ -126,6 +126,7 @@ function loadCachedEvents() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
         return parsed;
       }
     }
@@ -149,15 +150,28 @@ function saveCachedEvents(events) {
 // Placement Calendar Database array — loaded synchronously from localStorage
 let calendarEvents = loadCachedEvents();
 let eventsFetched = calendarEvents.length > 0;
+let isFetchingEvents = false;
 
-// Fetch events from secure backend using Stale-While-Revalidate pattern
+// Fetch events from secure backend with cache-busting and live revalidation
 async function fetchEvents(forceRender = false) {
+  if (isFetchingEvents && !forceRender) {
+    return calendarEvents;
+  }
+  isFetchingEvents = true;
+
   try {
-    const url = forceRender ? `${API}/api/events?_t=${Date.now()}` : `${API}/api/events`;
-    const res = await fetch(url);
+    const url = `${API}/api/events?_t=${Date.now()}`;
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     if (res.ok) {
       const freshEvents = await res.json();
       if (Array.isArray(freshEvents)) {
+        freshEvents.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
         const prevJson = JSON.stringify(calendarEvents);
         const nextJson = JSON.stringify(freshEvents);
         const hasChanged = prevJson !== nextJson;
@@ -181,10 +195,33 @@ async function fetchEvents(forceRender = false) {
     }
   } catch (err) {
     console.error('Failed to fetch events in background:', err);
+  } finally {
+    isFetchingEvents = false;
   }
   eventsFetched = true;
   return calendarEvents;
 }
+
+// Live polling & focus/visibility listeners
+let eventsPollingTimer = null;
+function startEventsPolling() {
+  if (eventsPollingTimer) clearInterval(eventsPollingTimer);
+  eventsPollingTimer = setInterval(() => {
+    if (!document.hidden) {
+      fetchEvents(false);
+    }
+  }, 25000); // Check every 25 seconds for live updates
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    fetchEvents(false);
+  }
+});
+
+window.addEventListener('focus', () => {
+  fetchEvents(false);
+});
 
 // Router Entry
 function render() {
@@ -343,6 +380,7 @@ function renderHome(container) {
     currentView = 'calendar';
     calendarInitialLoad = true;
     render();
+    fetchEvents(true);
   });
 
   // Trigger upcoming calendar event toast
@@ -798,6 +836,11 @@ function renderCalendar(container) {
               </div>
             </div>
             <div class="toolbar-subscribe" style="display: flex; gap: 8px; align-items: center;">
+              <button class="cal-sync-circle-btn" id="cal-sync-refresh-btn" title="Sync & Refresh latest calendar events" aria-label="Sync & Refresh latest calendar events">
+                <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.3" fill="none">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+              </button>
               <button class="cal-search-circle-btn" id="cal-search-toggle-btn" title="Search company drive dates" aria-label="Search company drive dates">
                 <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.3" fill="none">
                   <circle cx="11" cy="11" r="7"/>
@@ -882,6 +925,30 @@ function renderCalendar(container) {
   // Generate layouts
   generateCalendarGrid();
   renderTbdDrives();
+  renderAgendaList();
+
+  // Bind live sync/refresh button
+  const syncBtn = document.getElementById('cal-sync-refresh-btn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (syncBtn.classList.contains('syncing')) return;
+      syncBtn.classList.add('syncing');
+      syncBtn.title = 'Syncing latest events...';
+      try {
+        await fetchEvents(true);
+        generateCalendarGrid();
+        renderTbdDrives();
+        renderAgendaList();
+        syncBtn.title = 'Updated just now!';
+      } finally {
+        setTimeout(() => {
+          syncBtn.classList.remove('syncing');
+          syncBtn.title = 'Sync & Refresh latest calendar events';
+        }, 500);
+      }
+    });
+  }
 
   // Calendar navigation
   document.getElementById('cal-prev-btn')?.addEventListener('click', () => {
@@ -3963,15 +4030,19 @@ async function boot() {
   // Render UI immediately so user doesn't wait on a blank screen (populated instantly from cache)
   render();
 
-  // Fetch calendar events in the background with Stale-While-Revalidate
+  // Fetch calendar events in the background with immediate live data
   fetchEvents().then(() => {
     if (currentView === 'calendar') {
       generateCalendarGrid();
       renderTbdDrives();
+      renderAgendaList();
     } else if (currentView === 'home') {
       triggerUpcomingToast();
     }
   });
+
+  // Start continuous live background polling
+  startEventsPolling();
 
   const token = sessionStorage.getItem('adminToken');
   if (token) {

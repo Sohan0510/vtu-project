@@ -1495,6 +1495,47 @@ tr:hover td {
   box-shadow: 0 2px 8px rgba(42, 27, 17, 0.25);
 }
 
+/* ── Calendar Sync / Live Refresh Button ── */
+.cal-sync-circle-btn {
+  background: var(--cream-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wood-medium);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(42, 27, 17, 0.05);
+}
+
+.cal-sync-circle-btn:hover {
+  background: var(--bg-parchment);
+  border-color: var(--gold-satin);
+  color: var(--gold-dark);
+  box-shadow: 0 2px 8px rgba(140, 108, 58, 0.16);
+  transform: translateY(-1px);
+}
+
+.cal-sync-circle-btn:active {
+  transform: scale(0.93);
+}
+
+.cal-sync-circle-btn.syncing svg {
+  animation: calSyncSpin 0.7s linear infinite;
+  color: #2563eb;
+}
+
+@keyframes calSyncSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Expandable Drawer Container */
 .calendar-search-drawer {
   background: #fffdf9;
@@ -3622,15 +3663,17 @@ tr:hover td {
     height: 12px !important;
   }
 
-  /* Mobile toolbar search button */
-  .cal-search-circle-btn {
+  /* Mobile toolbar search and sync buttons */
+  .cal-search-circle-btn,
+  .cal-sync-circle-btn {
     width: 28px !important;
     height: 28px !important;
     min-width: 28px !important;
     min-height: 28px !important;
   }
 
-  .cal-search-circle-btn svg {
+  .cal-search-circle-btn svg,
+  .cal-sync-circle-btn svg {
     width: 13px !important;
     height: 13px !important;
   }

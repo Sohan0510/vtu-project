@@ -132,10 +132,14 @@ export class PlacementApiClient {
   }
 
   async getEvents() {
-    const url = `${this.baseUrl}/api/events`;
+    const url = `${this.baseUrl}/api/events?_t=${Date.now()}`;
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
     });
 
     if (!res.ok) {

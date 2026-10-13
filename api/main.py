@@ -841,33 +841,29 @@ def ai_parse_events(req: AIParseRequest, authorization: Optional[str] = Header(N
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
 
-# In-memory events cache for high-concurrency 0ms responses
+# In-memory events reference
 _cached_events = None
 _last_events_cache_time = 0.0
-EVENTS_CACHE_TTL = 60.0  # 60 seconds
 
 @app.get("/api/events")
 def get_calendar_events(response: Response):
-    """Retrieve all calendar events with memory caching and edge CDN headers."""
+    """Retrieve all calendar events with real-time freshness and no stale cache."""
     global _cached_events, _last_events_cache_time
-    now = time.time()
-    
-    if _cached_events is not None and (now - _last_events_cache_time) < EVENTS_CACHE_TTL:
-        response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
-        return _cached_events
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
 
     events = None
     if USE_MONGO_FOR_EVENTS and events_collection is not None:
         try:
-            events = list(events_collection.find({}, {"_id": 0}))
+            events = list(events_collection.find({}, {"_id": 0}).sort("id", 1))
         except Exception:
             pass
     if events is None:
         events = load_events_from_json()
         
     _cached_events = events
-    _last_events_cache_time = now
-    response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
+    _last_events_cache_time = time.time()
     return events
 
 @app.post("/api/events")

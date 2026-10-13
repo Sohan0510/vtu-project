@@ -5,10 +5,9 @@ const { google } = require('googleapis');
 // Cached connection for performance
 let cachedClient = null;
 
-// In-memory cache for events to eliminate redundant MongoDB Atlas queries
+// In-memory events reference
 let inMemoryEvents = null;
 let lastCacheTime = 0;
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
 async function connectToDatabase() {
   if (cachedClient) return cachedClient;
@@ -146,16 +145,14 @@ module.exports = async function (req, res) {
     const db = client.db(dbName);
     const collection = db.collection('calendar_events');
 
-    // GET /api/events - Publicly fetch all events
+    // GET /api/events - Publicly fetch all events with real-time freshness
     if (req.method === 'GET') {
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-      
-      const now = Date.now();
-      if (inMemoryEvents && (now - lastCacheTime) < CACHE_TTL_MS) {
-        return res.status(200).json(inMemoryEvents);
-      }
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
 
-      const events = await collection.find({}).toArray();
+      const events = await collection.find({}).sort({ id: 1 }).toArray();
       // Remove MongoDB internal _id before sending to frontend
       const cleanedEvents = events.map(ev => {
         delete ev._id;
@@ -163,7 +160,7 @@ module.exports = async function (req, res) {
       });
 
       inMemoryEvents = cleanedEvents;
-      lastCacheTime = now;
+      lastCacheTime = Date.now();
       return res.status(200).json(cleanedEvents);
     }
 
