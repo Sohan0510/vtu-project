@@ -10,11 +10,21 @@ let inMemoryEvents = null;
 let lastCacheTime = 0;
 
 async function connectToDatabase() {
-  if (cachedClient) return cachedClient;
-  const client = await MongoClient.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+  if (cachedClient) {
+    try {
+      await cachedClient.db('admin').command({ ping: 1 });
+      return cachedClient;
+    } catch (err) {
+      console.warn('MongoDB connection stale, reconnecting...', err.message);
+      cachedClient = null;
+    }
+  }
+  const client = new MongoClient(process.env.MONGO_URI, {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
   });
+  await client.connect();
   cachedClient = client;
   return client;
 }
@@ -147,14 +157,18 @@ module.exports = async function (req, res) {
     const db = client.db(dbName);
     const collection = db.collection('calendar_events');
 
-    // GET /api/events - Publicly fetch all events with real-time freshness
-    if (req.method === 'GET') {
+    // GET or HEAD /api/events - Publicly fetch all events with real-time freshness
+    if (req.method === 'GET' || req.method === 'HEAD') {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('Surrogate-Control', 'no-store');
       res.setHeader('CDN-Cache-Control', 'no-store');
       res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+
+      if (req.method === 'HEAD') {
+        return res.status(200).end();
+      }
 
       const events = await collection.find({}).sort({ id: 1 }).toArray();
       // Remove MongoDB internal _id before sending to frontend
@@ -230,6 +244,9 @@ module.exports = async function (req, res) {
         return res.status(400).json({ detail: 'Invalid input format.' });
       }
 
+      const isTbd = date.trim().toUpperCase() === 'TBD';
+      const safeDesc = typeof desc === 'string' ? desc.trim() : (desc ? String(desc).trim() : '');
+
       const newEvent = {
         id: Number(id), // Force number type
         title: String(title).trim(),
@@ -251,7 +268,6 @@ module.exports = async function (req, res) {
       // 2. Perform Google Calendar sync
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
       const auth = getGoogleAuth();
-      const isTbd = date.trim().toUpperCase() === 'TBD';
 
       if (auth && calendarId && !isTbd) {
         try {

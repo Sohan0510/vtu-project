@@ -90,13 +90,22 @@ function calculateSgpa(subjects, targetSem = null) {
 let cachedClient = null;
 
 async function connectToDatabase() {
-  if (cachedClient) return cachedClient;
+  if (cachedClient) {
+    try {
+      await cachedClient.db('admin').command({ ping: 1 });
+      return cachedClient;
+    } catch (err) {
+      console.warn('MongoDB connection stale, reconnecting...', err.message);
+      cachedClient = null;
+    }
+  }
 
-  const client = await MongoClient.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+  const client = new MongoClient(process.env.MONGO_URI, {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
   });
-
+  await client.connect();
   cachedClient = client;
   return client;
 }
