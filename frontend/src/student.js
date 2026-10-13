@@ -269,13 +269,7 @@ async function fetchEvents(forceRender = false) {
   fetchEventsPromise = (async () => {
     try {
       const url = `${API}/api/events?_t=${Date.now()}&_r=${Math.random().toString(36).substring(2, 7)}`;
-      const res = await fetch(url, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      });
+      const res = await fetch(url);
       if (res.ok) {
         const freshEvents = await res.json();
         if (Array.isArray(freshEvents)) {

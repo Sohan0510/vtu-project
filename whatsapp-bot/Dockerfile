@@ -14,4 +14,4 @@ VOLUME ["/app/auth_session"]
 
 ENV NODE_ENV=production
 
-CMD ["npm", "start"]
+CMD ["node", "bot.js"]

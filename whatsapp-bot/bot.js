@@ -17,6 +17,7 @@ const client = new PlacementApiClient();
 const AUTH_DIR = path.resolve(process.cwd(), 'auth_session');
 
 let botStatus = 'starting';
+let currentQr = null;
 let currentQrPngBuffer = null;
 let currentQrDataUrl = null;
 
@@ -141,9 +142,22 @@ const server = http.createServer(async (req, res) => {
   res.end('Not Found');
 });
 
-server.listen(PORT, () => {
-  console.log(`🌐 Healthcheck HTTP server listening on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 Healthcheck HTTP server listening on 0.0.0.0:${PORT}`);
   console.log(`📲 Open your Render URL (or /qr.png) in browser to scan crisp PNG QR code!`);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Uncaught Exception in Bot:', err.message, err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Unhandled Rejection in Bot:', reason);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, closing gracefully...');
+  server.close(() => process.exit(0));
 });
 
 async function startWhatsAppBot() {
