@@ -5183,3 +5183,92 @@ tr:hover td {
     padding: 10px;
   }
 }
+
+/* ── Live Calendar Realtime Sync Toast ── */
+.live-update-toast-banner {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1e1b4b;
+  color: #ffffff;
+  border: 1px solid #6366f1;
+  border-radius: 12px;
+  padding: 12px 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35), 0 0 15px rgba(99, 102, 241, 0.25);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.88rem;
+  transform: translateY(30px);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.live-update-toast-banner.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.live-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.live-toast-dot {
+  width: 9px;
+  height: 9px;
+  background: #10b981;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseToastDot 1.5s infinite;
+}
+
+@keyframes pulseToastDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.live-toast-text {
+  color: #e0e7ff;
+  line-height: 1.4;
+}
+
+.live-toast-text strong {
+  color: #ffffff;
+}
+
+.live-toast-view-btn {
+  background: #4f46e5;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.live-toast-view-btn:hover {
+  background: #4338ca;
+}
+
+.live-toast-close {
+  background: transparent;
+  border: none;
+  color: #a5b4fc;
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.live-toast-close:hover {
+  color: #ffffff;
+}

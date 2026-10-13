@@ -144,15 +144,114 @@ function loadCachedEvents() {
   return [];
 }
 
-// Save fresh events payload to localStorage cache
+// Save fresh events payload to localStorage cache and notify other tabs
 function saveCachedEvents(events) {
   try {
     if (Array.isArray(events)) {
       localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(events));
+      notifySyncBus();
     }
   } catch (e) {
     console.warn('Failed to save events to cache:', e);
   }
+}
+
+// Cross-tab & cross-window instant broadcast channel
+const calendarSyncBus = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('vtu_calendar_sync_bus') : null;
+
+if (calendarSyncBus) {
+  calendarSyncBus.onmessage = (e) => {
+    if (e.data?.type === 'CALENDAR_MUTATION') {
+      fetchEvents(true);
+    }
+  };
+}
+
+function notifySyncBus() {
+  try {
+    calendarSyncBus?.postMessage({ type: 'CALENDAR_MUTATION', t: Date.now() });
+  } catch {}
+}
+
+// Window storage listener: when localStorage cache is updated in another tab/window, sync instantly
+window.addEventListener('storage', (e) => {
+  if (e.key === EVENTS_CACHE_KEY && e.newValue) {
+    try {
+      const parsed = JSON.parse(e.newValue);
+      if (Array.isArray(parsed)) {
+        parsed.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+        calendarEvents = parsed;
+        if (currentView === 'calendar') {
+          generateCalendarGrid();
+          renderTbdDrives();
+          renderAgendaList();
+        }
+      }
+    } catch {}
+  }
+});
+
+// Accurate deep event difference comparison
+function areEventsDifferent(prevList, nextList) {
+  if (!Array.isArray(prevList) || !Array.isArray(nextList)) return true;
+  if (prevList.length !== nextList.length) return true;
+  
+  const prevMap = new Map();
+  for (const e of prevList) {
+    if (e && e.id !== undefined) prevMap.set(Number(e.id), e);
+  }
+  
+  for (const next of nextList) {
+    const prev = prevMap.get(Number(next.id));
+    if (!prev) return true;
+    if (prev.title !== next.title) return true;
+    if (prev.date !== next.date) return true;
+    if (prev.type !== next.type) return true;
+    if (prev.mode !== next.mode) return true;
+    if (prev.location !== next.location) return true;
+    if (prev.studentType !== next.studentType) return true;
+    if (prev.desc !== next.desc) return true;
+    const prevSubs = Array.isArray(prev.subtypes) ? prev.subtypes.join(',') : '';
+    const nextSubs = Array.isArray(next.subtypes) ? next.subtypes.join(',') : '';
+    if (prevSubs !== nextSubs) return true;
+  }
+  return false;
+}
+
+// Live Update Toast Notification for cross-browser events
+function showLiveUpdateToast(event) {
+  if (!event) return;
+  const existing = document.getElementById('live-update-toast');
+  if (existing) existing.remove();
+  
+  const toast = document.createElement('div');
+  toast.id = 'live-update-toast';
+  toast.className = 'live-update-toast-banner';
+  toast.innerHTML = `
+    <div class="live-toast-content">
+      <span class="live-toast-dot"></span>
+      <span class="live-toast-text"><strong>${escapeHTML(event.title)}</strong> ${event.date === 'TBD' ? 'added to Upcoming Drives (TBD)' : `scheduled for ${escapeHTML(event.date)}`}</span>
+      ${event.date && event.date !== 'TBD' ? `<button type="button" class="live-toast-view-btn" id="live-toast-goto">View Date</button>` : ''}
+      <button type="button" class="live-toast-close" aria-label="Close notification">&times;</button>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  
+  requestAnimationFrame(() => toast.classList.add('visible'));
+  
+  document.getElementById('live-toast-goto')?.addEventListener('click', () => {
+    const parts = event.date.split('-');
+    if (parts.length === 3) {
+      currentCalendarDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+      selectedCalendarDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      generateCalendarGrid();
+      renderAgendaList();
+    }
+    toast.remove();
+  });
+  
+  toast.querySelector('.live-toast-close')?.addEventListener('click', () => toast.remove());
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
 }
 
 // Placement Calendar Database array — loaded synchronously from localStorage
@@ -168,11 +267,11 @@ async function fetchEvents(forceRender = false) {
   isFetchingEvents = true;
 
   try {
-    const url = `${API}/api/events?_t=${Date.now()}`;
+    const url = `${API}/api/events?_t=${Date.now()}&_r=${Math.random().toString(36).substring(2, 7)}`;
     const res = await fetch(url, {
       cache: 'no-store',
       headers: {
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache'
       }
     });
@@ -180,20 +279,36 @@ async function fetchEvents(forceRender = false) {
       const freshEvents = await res.json();
       if (Array.isArray(freshEvents)) {
         freshEvents.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
-        const prevJson = JSON.stringify(calendarEvents);
-        const nextJson = JSON.stringify(freshEvents);
-        const hasChanged = prevJson !== nextJson;
-
-        calendarEvents = freshEvents;
-        saveCachedEvents(freshEvents);
-        eventsFetched = true;
+        const hasChanged = areEventsDifferent(calendarEvents, freshEvents);
 
         // If data changed or forceRender was requested, seamlessly refresh calendar components
         if (hasChanged || forceRender) {
+          const prevIds = new Set(calendarEvents.map(e => Number(e.id)));
+          const newlyAdded = freshEvents.filter(e => !prevIds.has(Number(e.id)));
+
+          calendarEvents = freshEvents;
+          try {
+            localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(freshEvents));
+          } catch {}
+          eventsFetched = true;
+
           if (currentView === 'calendar') {
             generateCalendarGrid();
             renderTbdDrives();
             renderAgendaList();
+
+            // Flash sync button to indicate live refresh
+            const syncBtn = document.getElementById('cal-sync-refresh-btn');
+            if (syncBtn && !syncBtn.classList.contains('syncing')) {
+              syncBtn.classList.add('syncing');
+              setTimeout(() => syncBtn.classList.remove('syncing'), 600);
+            }
+
+            // If a new event was added from another browser, display live notification
+            if (newlyAdded.length > 0 && !forceRender) {
+              const latest = newlyAdded[newlyAdded.length - 1];
+              showLiveUpdateToast(latest);
+            }
           } else if (currentView === 'home') {
             triggerUpcomingToast();
           }
@@ -210,26 +325,49 @@ async function fetchEvents(forceRender = false) {
   return calendarEvents;
 }
 
-// Live polling & focus/visibility listeners
+// High-frequency adaptive background polling (every 3s when on calendar view)
 let eventsPollingTimer = null;
 function startEventsPolling() {
-  if (eventsPollingTimer) clearInterval(eventsPollingTimer);
-  eventsPollingTimer = setInterval(() => {
-    if (!document.hidden) {
-      fetchEvents(false);
+  if (eventsPollingTimer) clearTimeout(eventsPollingTimer);
+
+  const poll = async () => {
+    // Poll every 3 seconds when on calendar view for near-instant cross-browser updates!
+    // Poll every 8 seconds when on home view or hidden
+    const interval = (currentView === 'calendar' && !document.hidden) ? 3000 : 8000;
+
+    try {
+      await fetchEvents(false);
+    } catch (e) {
+      console.warn('Live poll error:', e);
     }
-  }, 25000); // Check every 25 seconds for live updates
+
+    eventsPollingTimer = setTimeout(poll, interval);
+  };
+
+  eventsPollingTimer = setTimeout(poll, 3000);
 }
 
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
-    fetchEvents(false);
+    fetchEvents(true);
   }
 });
 
 window.addEventListener('focus', () => {
-  fetchEvents(false);
+  fetchEvents(true);
 });
+
+// Periodic idle check on mouse/touch interaction
+let lastInteractionSync = Date.now();
+window.addEventListener('pointerdown', () => {
+  const now = Date.now();
+  if (now - lastInteractionSync > 3000) {
+    lastInteractionSync = now;
+    if (currentView === 'calendar') {
+      fetchEvents(false);
+    }
+  }
+}, { passive: true });
 
 // Router Entry
 function render() {

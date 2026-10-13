@@ -149,10 +149,12 @@ module.exports = async function (req, res) {
 
     // GET /api/events - Publicly fetch all events with real-time freshness
     if (req.method === 'GET') {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('Surrogate-Control', 'no-store');
+      res.setHeader('CDN-Cache-Control', 'no-store');
+      res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
 
       const events = await collection.find({}).sort({ id: 1 }).toArray();
       // Remove MongoDB internal _id before sending to frontend
@@ -228,13 +230,29 @@ module.exports = async function (req, res) {
         return res.status(400).json({ detail: 'Invalid input format.' });
       }
 
-      const safeDesc = typeof desc === 'string' ? desc.trim() : (desc ? String(desc).trim() : '');
+      const newEvent = {
+        id: Number(id), // Force number type
+        title: String(title).trim(),
+        type: String(type).trim(),
+        mode: mode ? String(mode).trim() : null,
+        location: location ? String(location).trim() : null,
+        studentType: studentType ? String(studentType).trim() : null,
+        subtypes: Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()) : [],
+        date: isTbd ? 'TBD' : String(date).trim(),
+        desc: safeDesc,
+        googleEventId: null
+      };
 
-      let googleEventId = null;
+      // 1. Immediately insert into MongoDB Atlas so all clients see changes in milliseconds
+      await collection.insertOne(newEvent);
+      inMemoryEvents = null;
+      lastCacheTime = 0;
+
+      // 2. Perform Google Calendar sync
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
       const auth = getGoogleAuth();
       const isTbd = date.trim().toUpperCase() === 'TBD';
-      
+
       if (auth && calendarId && !isTbd) {
         try {
           const calendar = google.calendar({ version: 'v3', auth });
@@ -259,28 +277,14 @@ module.exports = async function (req, res) {
             calendarId: calendarId,
             resource: gCalEvent,
           });
-          googleEventId = response.data.id;
+          if (response.data && response.data.id) {
+            await collection.updateOne({ id: Number(id) }, { $set: { googleEventId: response.data.id } });
+          }
         } catch (err) {
           console.error("Google Calendar Insert Error:", err);
         }
       }
 
-      const newEvent = {
-        id: Number(id), // Force number type
-        title: String(title).trim(),
-        type: String(type).trim(),
-        mode: mode ? String(mode).trim() : null,
-        location: location ? String(location).trim() : null,
-        studentType: studentType ? String(studentType).trim() : null,
-        subtypes: Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()) : [],
-        date: isTbd ? 'TBD' : String(date).trim(),
-        desc: safeDesc,
-        googleEventId: googleEventId
-      };
-
-      await collection.insertOne(newEvent);
-      inMemoryEvents = null;
-      lastCacheTime = 0;
       return res.status(201).json({ detail: 'Event created.' });
     }
 
@@ -310,6 +314,12 @@ module.exports = async function (req, res) {
         desc: safeDesc
       };
 
+      // 1. Immediately update MongoDB Atlas
+      await collection.updateOne(query, { $set: updatedFields });
+      inMemoryEvents = null;
+      lastCacheTime = 0;
+
+      // 2. Perform Google Calendar sync
       let googleEventId = existingEvent?.googleEventId;
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
       const auth = getGoogleAuth();
@@ -325,7 +335,7 @@ module.exports = async function (req, res) {
             
             const gCalEvent = {
               summary: cleanTitle(title),
-              description: formatGoogleCalendarDescription(desc, {
+              description: formatGoogleCalendarDescription(safeDesc, {
                 type,
                 mode,
                 location,
@@ -347,8 +357,10 @@ module.exports = async function (req, res) {
                 calendarId: calendarId,
                 resource: gCalEvent,
               });
-              googleEventId = response.data.id;
-              updatedFields.googleEventId = googleEventId;
+              if (response.data && response.data.id) {
+                googleEventId = response.data.id;
+                await collection.updateOne(query, { $set: { googleEventId } });
+              }
             }
           } else if (googleEventId) {
             // Moved back to TBD from a scheduled date
@@ -356,17 +368,13 @@ module.exports = async function (req, res) {
               calendarId: calendarId,
               eventId: googleEventId,
             });
-            updatedFields.googleEventId = null;
+            await collection.updateOne(query, { $set: { googleEventId: null } });
           }
         } catch (err) {
           console.error("Google Calendar Sync Error on Update:", err);
         }
       }
 
-      await collection.updateOne(query, { $set: updatedFields });
-      inMemoryEvents = null;
-      lastCacheTime = 0;
-      
       return res.status(200).json({ detail: 'Event updated.' });
     }
 
@@ -381,6 +389,12 @@ module.exports = async function (req, res) {
       const query = { id: Number(id) };
       const existingEvent = await collection.findOne(query);
 
+      // 1. Immediately delete from MongoDB Atlas
+      await collection.deleteOne(query);
+      inMemoryEvents = null;
+      lastCacheTime = 0;
+
+      // 2. Perform Google Calendar deletion
       const googleEventId = existingEvent?.googleEventId;
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
       const auth = getGoogleAuth();
@@ -397,10 +411,6 @@ module.exports = async function (req, res) {
         }
       }
 
-      await collection.deleteOne(query);
-      inMemoryEvents = null;
-      lastCacheTime = 0;
-      
       return res.status(200).json({ detail: 'Event deleted.' });
     }
     return res.status(405).json({ detail: 'Method not allowed' });
