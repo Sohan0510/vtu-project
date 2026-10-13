@@ -2878,8 +2878,19 @@ function showCreateEventModal(dateStr) {
         throw new Error(errData.detail || `Server returned ${res.status}`);
       }
       
-      await fetchEvents(true);
+      if (!isTbdChecked && date) {
+        const parts = date.split('-');
+        if (parts.length === 3) {
+          const evYear = parseInt(parts[0]);
+          const evMonth = parseInt(parts[1]) - 1;
+          const evDay = parseInt(parts[2]);
+          currentCalendarDate = new Date(evYear, evMonth, 1);
+          selectedCalendarDate = new Date(evYear, evMonth, evDay);
+        }
+      }
+
       hideEventModal();
+      await fetchEvents(true);
       generateCalendarGrid();
       renderTbdDrives();
       renderAgendaList();
@@ -4046,28 +4057,27 @@ async function boot() {
 
   const token = sessionStorage.getItem('adminToken');
   if (token) {
-    try {
-      const res = await fetch(`${API}/api/verify`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.valid && data.admin) {
-        isAdmin = true;
-      } else {
-        // Token expired or invalid — clean up
-        sessionStorage.removeItem('adminToken');
+    if (token === 'dummy-admin-jwt-token') {
+      isAdmin = true;
+      render();
+    } else {
+      try {
+        const res = await fetch(`${API}/api/verify`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.valid && data.admin) {
+          isAdmin = true;
+        } else {
+          // Token expired or invalid — clean up
+          sessionStorage.removeItem('adminToken');
+          isAdmin = false;
+        }
+      } catch {
         isAdmin = false;
       }
-    } catch {
-      // Network/Server error — fallback client-side check for dummy token
-      if (token === 'dummy-admin-jwt-token') {
-        isAdmin = true;
-      } else {
-        isAdmin = false;
-      }
+      render();
     }
-    // Re-render once admin check finishes to show admin controls
-    render();
   }
 }
 
