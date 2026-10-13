@@ -17,7 +17,6 @@ const client = new PlacementApiClient();
 const AUTH_DIR = path.resolve(process.cwd(), 'auth_session');
 
 let botStatus = 'starting';
-let currentQr = null;
 let currentQrPngBuffer = null;
 let currentQrDataUrl = null;
 

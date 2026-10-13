@@ -798,10 +798,53 @@ function renderCalendar(container) {
               </div>
             </div>
             <div class="toolbar-subscribe" style="display: flex; gap: 8px; align-items: center;">
+              <button class="cal-search-circle-btn" id="cal-search-toggle-btn" title="Search company drive dates" aria-label="Search company drive dates">
+                <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.3" fill="none">
+                  <circle cx="11" cy="11" r="7"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </button>
               <button onclick="showSubscribeModal()" class="toolbar-btn btn-subscribe-cal" style="background: #4285F4; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 2V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 10H21" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H12.01" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Subscribe
               </button>
+            </div>
+          </div>
+
+          <!-- Expandable Company Drive Date Search Panel -->
+          <div class="calendar-search-drawer" id="calendar-search-drawer" style="display: none;">
+            <div class="cal-search-inner">
+              <div class="cal-search-bar-row">
+                <div class="cal-search-input-wrap">
+                  <svg class="cal-search-input-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none">
+                    <circle cx="11" cy="11" r="7"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input 
+                    type="text" 
+                    id="cal-company-search-input" 
+                    class="cal-search-wide-input" 
+                    placeholder="Enter company name (e.g. Google, Cisco, TCS, Amazon)..." 
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button type="button" id="cal-search-clear-btn" class="cal-search-clear-btn" title="Clear input" style="display: none;">&times;</button>
+                </div>
+                <button type="button" id="cal-search-exec-btn" class="cal-search-exec-btn">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.4" fill="none">
+                    <circle cx="11" cy="11" r="7"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <span>Search</span>
+                </button>
+                <button type="button" id="cal-search-close-btn" class="cal-search-close-btn" title="Close search" aria-label="Close search">
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="cal-search-results-panel" id="cal-search-results-panel" style="display: none;"></div>
             </div>
           </div>
 
@@ -890,6 +933,288 @@ function renderCalendar(container) {
   // Close modal when clicking background overlay
   document.getElementById('event-modal').addEventListener('click', (e) => {
     if (e.target.id === 'event-modal') hideEventModal();
+  });
+
+  // Initialize company date search drawer
+  setupCalendarCompanySearch();
+}
+
+// 4.5. Calendar Company Drive Date Search
+function setupCalendarCompanySearch() {
+  const toggleBtn = document.getElementById('cal-search-toggle-btn');
+  const drawer = document.getElementById('calendar-search-drawer');
+  const searchInput = document.getElementById('cal-company-search-input');
+  const searchExecBtn = document.getElementById('cal-search-exec-btn');
+  const closeBtn = document.getElementById('cal-search-close-btn');
+  const clearBtn = document.getElementById('cal-search-clear-btn');
+  const resultsPanel = document.getElementById('cal-search-results-panel');
+
+  if (!toggleBtn || !drawer || !searchInput) return;
+
+  function openSearchDrawer() {
+    drawer.style.display = 'block';
+    toggleBtn.classList.add('active');
+    setTimeout(() => searchInput.focus(), 60);
+  }
+
+  function closeSearchDrawer() {
+    drawer.style.display = 'none';
+    toggleBtn.classList.remove('active');
+  }
+
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (drawer.style.display === 'none' || drawer.style.display === '') {
+      openSearchDrawer();
+    } else {
+      closeSearchDrawer();
+    }
+  });
+
+  closeBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeSearchDrawer();
+  });
+
+  searchInput.addEventListener('input', () => {
+    if (searchInput.value.trim().length > 0) {
+      if (clearBtn) clearBtn.style.display = 'inline-flex';
+    } else {
+      if (clearBtn) clearBtn.style.display = 'none';
+      if (resultsPanel) {
+        resultsPanel.style.display = 'none';
+        resultsPanel.innerHTML = '';
+      }
+    }
+  });
+
+  clearBtn?.addEventListener('click', () => {
+    searchInput.value = '';
+    clearBtn.style.display = 'none';
+    searchInput.focus();
+    if (resultsPanel) {
+      resultsPanel.style.display = 'none';
+      resultsPanel.innerHTML = '';
+    }
+  });
+
+  function performCompanySearch() {
+    const rawQuery = searchInput.value.trim();
+    if (!rawQuery) {
+      resultsPanel.style.display = 'block';
+      resultsPanel.innerHTML = `
+        <div class="cal-search-empty-prompt">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Please enter a company name (e.g. Cisco, TCS, Amazon) to find drive dates.</span>
+        </div>
+      `;
+      return;
+    }
+
+    const query = rawQuery.toLowerCase();
+
+    // Search events matching query in title, desc, or subtypes
+    const matches = calendarEvents.filter(ev => {
+      const matchTitle = ev.title && ev.title.toLowerCase().includes(query);
+      const matchDesc = ev.desc && ev.desc.toLowerCase().includes(query);
+      const matchSubtype = Array.isArray(ev.subtypes) && ev.subtypes.some(st => String(st).toLowerCase().includes(query));
+      return matchTitle || matchDesc || matchSubtype;
+    });
+
+    resultsPanel.style.display = 'block';
+
+    if (matches.length === 0) {
+      resultsPanel.innerHTML = `
+        <div class="cal-search-no-results">
+          <div class="cal-no-results-icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="1.8" fill="none">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <line x1="8" y1="11" x2="14" y2="11"/>
+            </svg>
+          </div>
+          <div class="cal-no-results-title">No drive dates found for "<strong>${escapeHTML(rawQuery)}</strong>"</div>
+          <div class="cal-no-results-subtitle">Try searching with fewer characters or check for alternate company spellings.</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Sort matches: confirmed upcoming dates first, confirmed past dates next, TBD dates
+    const sortedMatches = [...matches].sort((a, b) => {
+      const aIsTbd = !a.date || a.date.trim().toUpperCase() === 'TBD';
+      const bIsTbd = !b.date || b.date.trim().toUpperCase() === 'TBD';
+      if (aIsTbd && !bIsTbd) return 1;
+      if (!aIsTbd && bIsTbd) return -1;
+      if (aIsTbd && bIsTbd) return (a.title || '').localeCompare(b.title || '');
+      return a.date.localeCompare(b.date);
+    });
+
+    let resultsHtml = `
+      <div class="cal-search-results-header">
+        <span class="cal-search-count-badge">Found <strong>${sortedMatches.length}</strong> drive schedule${sortedMatches.length === 1 ? '' : 's'}</span>
+        <span class="cal-search-hint">Click any company to open its calendar date</span>
+      </div>
+      <div class="cal-search-results-list">
+    `;
+
+    sortedMatches.forEach(ev => {
+      const isTbd = !ev.date || ev.date.trim().toUpperCase() === 'TBD';
+      let dateBadgeHtml = '';
+      let relativeTagHtml = '';
+
+      if (isTbd) {
+        dateBadgeHtml = `
+          <div class="cal-result-date-badge tbd">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span class="cal-date-text">Date: To Be Decided (TBD)</span>
+          </div>
+        `;
+      } else {
+        const parts = ev.date.split('-');
+        const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        const formattedDate = dateObj.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        // Calculate relative difference in calendar days
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfTarget = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+        const diffDays = Math.round((startOfTarget - startOfToday) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+          relativeTagHtml = `<span class="cal-rel-badge rel-today">Today</span>`;
+        } else if (diffDays === 1) {
+          relativeTagHtml = `<span class="cal-rel-badge rel-tomorrow">Tomorrow</span>`;
+        } else if (diffDays > 1 && diffDays <= 7) {
+          relativeTagHtml = `<span class="cal-rel-badge rel-soon">In ${diffDays} days</span>`;
+        } else if (diffDays > 7) {
+          relativeTagHtml = `<span class="cal-rel-badge rel-future">In ${diffDays} days</span>`;
+        } else {
+          relativeTagHtml = `<span class="cal-rel-badge rel-past">Completed</span>`;
+        }
+
+        dateBadgeHtml = `
+          <div class="cal-result-date-badge confirmed">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <span class="cal-date-text"><strong>${formattedDate}</strong></span>
+            ${relativeTagHtml}
+          </div>
+        `;
+      }
+
+      // Location / Mode badge
+      let locationBadge = '';
+      if (ev.location) {
+        const locLabel = (ev.location === 'rvitm' || ev.location === 'oncampus') ? 'RVITM' : (ev.location === 'rvce' || ev.location === 'offcampus') ? 'RVCE' : ev.location === 'worksite' ? 'WORKSITE' : ev.location.toUpperCase();
+        const locClass = (ev.location === 'rvitm' || ev.location === 'oncampus') ? 'oncampus' : (ev.location === 'rvce' || ev.location === 'offcampus') ? 'offcampus' : 'worksite';
+        locationBadge = `<span class="cal-result-tag tag-${locClass}">${locLabel}</span>`;
+      }
+
+      let modeBadge = '';
+      if (ev.mode) {
+        modeBadge = `<span class="cal-result-tag tag-${ev.mode}">${ev.mode.toUpperCase()}</span>`;
+      }
+
+      let subtypeTags = '';
+      if (ev.subtypes && Array.isArray(ev.subtypes)) {
+        ev.subtypes.forEach(st => {
+          subtypeTags += `<span class="cal-result-subtype-tag">${escapeHTML(st)}</span>`;
+        });
+      }
+
+      resultsHtml += `
+        <div class="cal-search-result-card" data-event-id="${ev.id}">
+          <div class="cal-result-main-info">
+            <div class="cal-result-company-row">
+              <span class="cal-result-company-name">${escapeHTML(ev.title)}</span>
+              <div class="cal-result-meta-tags">
+                ${modeBadge}
+                ${locationBadge}
+                ${subtypeTags}
+              </div>
+            </div>
+            <div class="cal-result-date-row">
+              ${dateBadgeHtml}
+            </div>
+          </div>
+          <div class="cal-result-action">
+            <span class="cal-result-action-link">
+              <span>View Date</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.2" fill="none">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+      `;
+    });
+
+    resultsHtml += `</div>`;
+    resultsPanel.innerHTML = resultsHtml;
+
+    // Attach click listeners to each result card
+    resultsPanel.querySelectorAll('.cal-search-result-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const eventId = parseInt(card.getAttribute('data-event-id'));
+        const ev = calendarEvents.find(e => e.id === eventId);
+        if (!ev) return;
+
+        const isTbd = !ev.date || ev.date.trim().toUpperCase() === 'TBD';
+        if (!isTbd) {
+          const parts = ev.date.split('-');
+          const evYear = parseInt(parts[0]);
+          const evMonth = parseInt(parts[1]) - 1;
+          const evDay = parseInt(parts[2]);
+
+          // Navigate calendar to event's month and select date
+          currentCalendarDate = new Date(evYear, evMonth, 1);
+          selectedCalendarDate = new Date(evYear, evMonth, evDay);
+          generateCalendarGrid();
+
+          // Scroll agenda view into view smoothly
+          const agendaView = document.getElementById('calendar-agenda-view');
+          if (agendaView) {
+            setTimeout(() => {
+              agendaView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 60);
+          }
+        }
+
+        // Open details modal
+        if (isAdmin) {
+          showEventDetailModalAdmin(ev);
+        } else {
+          showEventDetailModalVisitor(ev);
+        }
+      });
+    });
+  }
+
+  // Bind Search button
+  searchExecBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    performCompanySearch();
+  });
+
+  // Bind Enter key inside input
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      performCompanySearch();
+    }
   });
 }
 
