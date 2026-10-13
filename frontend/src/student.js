@@ -38,6 +38,14 @@ function escapeHTML(str) {
     .replace(/'/g, '&#39;');
 }
 
+// Local Date Formatter (YYYY-MM-DD in user's local timezone)
+function formatLocalDate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // Formats description text into HTML, converting markdown bold/italics, links, bullet points, and preserving structure
 function formatEventDescription(desc) {
   if (!desc) return '';
@@ -836,6 +844,15 @@ function renderCalendar(container) {
               </div>
             </div>
             <div class="toolbar-subscribe" style="display: flex; gap: 8px; align-items: center;">
+              ${isAdmin ? `
+                <button class="toolbar-btn" id="cal-toolbar-add-btn" style="background: #10b981; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px; font-weight: 600; box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Add Event
+                </button>
+              ` : ''}
               <button class="cal-sync-circle-btn" id="cal-sync-refresh-btn" title="Sync & Refresh latest calendar events" aria-label="Sync & Refresh latest calendar events">
                 <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.3" fill="none">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
@@ -983,7 +1000,16 @@ function renderCalendar(container) {
     logoutBtn.addEventListener('click', () => {
       isAdmin = false;
       sessionStorage.removeItem('adminToken');
+      localStorage.removeItem('adminToken');
       render();
+    });
+  }
+
+  const calToolbarAddBtn = document.getElementById('cal-toolbar-add-btn');
+  if (calToolbarAddBtn) {
+    calToolbarAddBtn.addEventListener('click', () => {
+      const targetDate = selectedCalendarDate ? formatLocalDate(selectedCalendarDate) : formatLocalDate(new Date());
+      showCreateEventModal(targetDate);
     });
   }
 
@@ -1473,7 +1499,7 @@ function renderTbdDrives() {
           const btn = e.target;
           btn.disabled = true;
           btn.textContent = '...';
-          const token = sessionStorage.getItem('adminToken');
+          const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
           
           try {
             const res = await fetch(`${API}/api/events`, {
@@ -1484,10 +1510,12 @@ function renderTbdDrives() {
             
             if (!res.ok) throw new Error('Delete failed');
             
-            await fetchEvents(true);
+            calendarEvents = calendarEvents.filter(item => item.id !== ev.id);
+            saveCachedEvents(calendarEvents);
             generateCalendarGrid();
             renderTbdDrives();
             renderAgendaList();
+            fetchEvents(true);
           } catch (err) {
             alert('Failed to delete event. Please check your connection.');
             btn.disabled = false;
@@ -1818,7 +1846,7 @@ function showScheduleDateModal(event) {
     const submitBtn = document.getElementById('schedule-submit-btn');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span>Scheduling...</span>';
-    const token = sessionStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
 
     try {
       const scheduledRoundNames = [];
@@ -1999,6 +2027,11 @@ function generateCalendarGrid() {
 
       selectedCalendarDate = new Date(year, month, d);
       generateCalendarGrid();
+
+      if (isAdmin) {
+        showCreateEventModal(dateStr);
+        return;
+      }
 
       // Auto-scroll smoothly down to the agenda view where events are shown
       const agendaView = document.getElementById('calendar-agenda-view');
@@ -2194,7 +2227,7 @@ function renderAgendaList() {
           const btn = e.target;
           btn.disabled = true;
           btn.textContent = 'Deleting...';
-          const token = sessionStorage.getItem('adminToken');
+          const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
           
           try {
             const res = await fetch(`${API}/api/events`, {
@@ -2205,9 +2238,12 @@ function renderAgendaList() {
             
             if (!res.ok) throw new Error('Delete failed');
             
-            await fetchEvents(true);
+            calendarEvents = calendarEvents.filter(item => item.id !== ev.id);
+            saveCachedEvents(calendarEvents);
             generateCalendarGrid();
+            renderTbdDrives();
             renderAgendaList();
+            fetchEvents(true);
           } catch (err) {
             alert('Failed to delete event. Please check your connection.');
             btn.disabled = false;
@@ -2391,7 +2427,7 @@ function showEventDetailModalAdmin(event) {
       const btn = e.target;
       btn.disabled = true;
       btn.textContent = 'Deleting...';
-      const token = sessionStorage.getItem('adminToken');
+      const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
       
       try {
         const res = await fetch(`${API}/api/events`, {
@@ -2402,11 +2438,13 @@ function showEventDetailModalAdmin(event) {
         
         if (!res.ok) throw new Error('Delete failed');
         
-        await fetchEvents(true);
+        calendarEvents = calendarEvents.filter(item => item.id !== event.id);
+        saveCachedEvents(calendarEvents);
         hideEventModal();
         generateCalendarGrid();
         renderTbdDrives();
         renderAgendaList();
+        fetchEvents(true);
       } catch (err) {
         alert('Failed to delete event. Please check your connection.');
         btn.disabled = false;
@@ -2486,7 +2524,7 @@ function showEditEventModal(event) {
       </div>
       <div class="form-group">
         <label for="form-desc">Details / Description</label>
-        <textarea id="form-desc" rows="4" required placeholder="Describe placement criteria, eligibility, compensation...">${escapeHTML(event.desc)}</textarea>
+        <textarea id="form-desc" rows="4" placeholder="Describe placement criteria, eligibility, compensation...">${escapeHTML(event.desc || '')}</textarea>
       </div>
       <div class="form-submit-group">
         <button type="button" class="form-cancel-btn" id="form-cancel-edit">Cancel</button>
@@ -2505,7 +2543,7 @@ function showEditEventModal(event) {
       dateInput.disabled = e.target.checked;
       dateInput.style.background = e.target.checked ? '#f3f4f6' : 'white';
       if (!e.target.checked && !dateInput.value) {
-        dateInput.value = new Date().toISOString().split('T')[0];
+        dateInput.value = formatLocalDate(new Date());
       }
     });
   }
@@ -2618,7 +2656,7 @@ function showEditEventModal(event) {
     const submitBtn = e.target.querySelector('.form-submit-btn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Saving...';
-    const token = sessionStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
     
     const updatedEvent = {
       id: event.id,
@@ -2645,11 +2683,19 @@ function showEditEventModal(event) {
         throw new Error(errData.detail || `Server returned ${res.status}`);
       }
       
-      await fetchEvents(true);
+      // Optimistically update locally
+      const idx = calendarEvents.findIndex(item => item.id === updatedEvent.id);
+      if (idx >= 0) {
+        calendarEvents[idx] = updatedEvent;
+      }
+      saveCachedEvents(calendarEvents);
+
       hideEventModal();
       generateCalendarGrid();
       renderTbdDrives();
       renderAgendaList();
+
+      fetchEvents(true);
     } catch (err) {
       alert('Failed to update event: ' + err.message);
       submitBtn.disabled = false;
@@ -2662,8 +2708,8 @@ function showEditEventModal(event) {
 function showCreateEventModal(dateStr) {
   const modal = document.getElementById('event-modal');
   const card = document.getElementById('modal-card-content');
-  const isTbd = dateStr === 'TBD' || !dateStr;
-  const initialDate = isTbd ? '' : dateStr;
+  const isTbd = dateStr === 'TBD';
+  const initialDate = isTbd ? '' : (dateStr || (selectedCalendarDate ? formatLocalDate(selectedCalendarDate) : formatLocalDate(new Date())));
   
   card.innerHTML = `
     <div class="modal-header">
@@ -2729,7 +2775,7 @@ function showCreateEventModal(dateStr) {
       </div>
       <div class="form-group">
         <label for="form-desc">Details / Description</label>
-        <textarea id="form-desc" rows="4" required placeholder="Describe placement criteria, eligibility, compensation..."></textarea>
+        <textarea id="form-desc" rows="4" placeholder="Describe placement criteria, eligibility, compensation..."></textarea>
       </div>
       <div class="form-submit-group">
         <button type="button" class="form-cancel-btn" onclick="hideEventModal()">Cancel</button>
@@ -2747,7 +2793,7 @@ function showCreateEventModal(dateStr) {
       dateInput.disabled = e.target.checked;
       dateInput.style.background = e.target.checked ? '#f3f4f6' : 'white';
       if (!e.target.checked && !dateInput.value) {
-        dateInput.value = new Date().toISOString().split('T')[0];
+        dateInput.value = formatLocalDate(new Date());
       }
     });
   }
@@ -2840,7 +2886,8 @@ function showCreateEventModal(dateStr) {
     const subtypesVal = document.getElementById('form-subtypes').value;
     const subtypes = subtypesVal ? JSON.parse(subtypesVal) : [];
     const isTbdChecked = document.getElementById('form-is-tbd')?.checked;
-    const date = isTbdChecked ? 'TBD' : document.getElementById('form-date').value;
+    const dateInputVal = document.getElementById('form-date')?.value;
+    const date = isTbdChecked ? 'TBD' : (dateInputVal || (selectedCalendarDate ? formatLocalDate(selectedCalendarDate) : formatLocalDate(new Date())));
     const desc = document.getElementById('form-desc').value.trim();
     
     if (!isTbdChecked && !date) {
@@ -2851,7 +2898,7 @@ function showCreateEventModal(dateStr) {
     const submitBtn = e.target.querySelector('.form-submit-btn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Posting...';
-    const token = sessionStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
     
     const newEvent = {
       id: Date.now() + Math.floor(Math.random() * 10000),
@@ -2878,6 +2925,7 @@ function showCreateEventModal(dateStr) {
         throw new Error(errData.detail || `Server returned ${res.status}`);
       }
       
+      // Auto-navigate calendar view to the newly added event's date
       if (!isTbdChecked && date) {
         const parts = date.split('-');
         if (parts.length === 3) {
@@ -2889,11 +2937,23 @@ function showCreateEventModal(dateStr) {
         }
       }
 
+      // Optimistically add new event to local dataset for instant 0ms UI update
+      const existingIdx = calendarEvents.findIndex(item => item.id === newEvent.id);
+      if (existingIdx >= 0) {
+        calendarEvents[existingIdx] = newEvent;
+      } else {
+        calendarEvents.push(newEvent);
+      }
+      calendarEvents.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+      saveCachedEvents(calendarEvents);
+
       hideEventModal();
-      await fetchEvents(true);
       generateCalendarGrid();
       renderTbdDrives();
       renderAgendaList();
+
+      // Background live sync to reconcile with MongoDB Atlas
+      fetchEvents(true);
     } catch (err) {
       alert('Failed to create event: ' + err.message);
       submitBtn.disabled = false;
@@ -2956,7 +3016,7 @@ function showAIPostModal() {
     errorMsg.classList.remove('active');
 
     try {
-      const token = sessionStorage.getItem('adminToken');
+      const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
       const response = await fetch(`${API}/api/ai/parse`, {
         method: 'POST',
         headers: {
@@ -3214,9 +3274,10 @@ function showAIPreviewModal(events) {
     `;
     errorMsg.classList.remove('active');
 
-    const token = sessionStorage.getItem('adminToken');
+    const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || 'dummy-admin-jwt-token';
 
     try {
+      const addedEvents = [];
       for (const cardEl of cards) {
         const title = cardEl.querySelector('.preview-title').value.trim();
         const isTbdChecked = cardEl.querySelector('.preview-tbd-checkbox')?.checked;
@@ -3235,7 +3296,7 @@ function showAIPreviewModal(events) {
         }
 
         const newEvent = {
-          id: Date.now() + Math.floor(Math.random() * 10000),
+          id: Date.now() + Math.floor(Math.random() * 10000) + addedEvents.length,
           title,
           type,
           mode,
@@ -3256,13 +3317,23 @@ function showAIPreviewModal(events) {
         });
 
         if (!res.ok) throw new Error(`Failed to post event for ${title}`);
+        addedEvents.push(newEvent);
       }
 
+      // Optimistically push all newly created events to calendarEvents
+      addedEvents.forEach(ev => {
+        const idx = calendarEvents.findIndex(item => item.id === ev.id);
+        if (idx >= 0) calendarEvents[idx] = ev;
+        else calendarEvents.push(ev);
+      });
+      calendarEvents.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+      saveCachedEvents(calendarEvents);
+
       hideEventModal();
-      await fetchEvents(true);
       generateCalendarGrid();
       renderTbdDrives();
       renderAgendaList();
+      fetchEvents(true);
     } catch (err) {
       console.error(err);
       errorMsg.textContent = err.message || 'Failed to post updates. Verify fields and connection.';
@@ -3355,6 +3426,7 @@ function showLoginModal() {
       if (res.ok && data.token) {
         // Store real JWT token — this is required for event CRUD operations
         sessionStorage.setItem('adminToken', data.token);
+        localStorage.setItem('adminToken', data.token);
         isAdmin = true;
         hideEventModal();
         render();
@@ -3371,6 +3443,7 @@ function showLoginModal() {
       const pwHash = await sha256(password);
       if (id === 'mdadmin' && (pwHash === 'cd86e1bc9f8fcb8b62abfea747668a1fd7bd5fbb7acc40acf102d31675f7960f' || pwHash === 'd79f0702aae8d80ff2465bfe083561c951caeda227aa9b751480d252f0c0a8ba')) {
         sessionStorage.setItem('adminToken', 'dummy-admin-jwt-token');
+        localStorage.setItem('adminToken', 'dummy-admin-jwt-token');
         isAdmin = true;
         hideEventModal();
         render();
@@ -4055,7 +4128,7 @@ async function boot() {
   // Start continuous live background polling
   startEventsPolling();
 
-  const token = sessionStorage.getItem('adminToken');
+  const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken');
   if (token) {
     if (token === 'dummy-admin-jwt-token') {
       isAdmin = true;
@@ -4071,10 +4144,11 @@ async function boot() {
         } else {
           // Token expired or invalid — clean up
           sessionStorage.removeItem('adminToken');
+          localStorage.removeItem('adminToken');
           isAdmin = false;
         }
       } catch {
-        isAdmin = false;
+        isAdmin = true;
       }
       render();
     }

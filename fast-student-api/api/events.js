@@ -224,9 +224,11 @@ module.exports = async function (req, res) {
       const { id, title, type, mode, location, studentType, subtypes, date, desc } = req.body || {};
       
       // Strict type checking to prevent NoSQL injection
-      if (typeof id !== 'number' || typeof title !== 'string' || typeof type !== 'string' || typeof date !== 'string' || typeof desc !== 'string') {
+      if (!id || typeof id !== 'number' || !title || typeof title !== 'string' || !type || typeof type !== 'string' || !date || typeof date !== 'string') {
         return res.status(400).json({ detail: 'Invalid input format.' });
       }
+
+      const safeDesc = typeof desc === 'string' ? desc.trim() : (desc ? String(desc).trim() : '');
 
       let googleEventId = null;
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
@@ -243,7 +245,7 @@ module.exports = async function (req, res) {
           
           const gCalEvent = {
             summary: cleanTitle(title),
-            description: formatGoogleCalendarDescription(desc, {
+            description: formatGoogleCalendarDescription(safeDesc, {
               type,
               mode,
               location,
@@ -272,7 +274,7 @@ module.exports = async function (req, res) {
         studentType: studentType ? String(studentType).trim() : null,
         subtypes: Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()) : [],
         date: isTbd ? 'TBD' : String(date).trim(),
-        desc: String(desc).trim(),
+        desc: safeDesc,
         googleEventId: googleEventId
       };
 
@@ -295,6 +297,7 @@ module.exports = async function (req, res) {
       const existingEvent = await collection.findOne(query);
 
       const isTbd = date ? date.trim().toUpperCase() === 'TBD' : false;
+      const safeDesc = typeof desc === 'string' ? desc.trim() : (desc ? String(desc).trim() : '');
 
       const updatedFields = {
         title: String(title).trim(),
@@ -304,7 +307,7 @@ module.exports = async function (req, res) {
         studentType: studentType ? String(studentType).trim() : null,
         subtypes: Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()) : [],
         date: isTbd ? 'TBD' : String(date).trim(),
-        desc: String(desc).trim()
+        desc: safeDesc
       };
 
       let googleEventId = existingEvent?.googleEventId;
