@@ -985,15 +985,6 @@ function renderCalendar(container) {
               </div>
             </div>
             <div class="toolbar-subscribe" style="display: flex; gap: 8px; align-items: center;">
-              ${isAdmin ? `
-                <button class="toolbar-btn" id="cal-toolbar-add-btn" style="background: #10b981; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px; font-weight: 600; box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);">
-                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                  Add Event
-                </button>
-              ` : ''}
               <button class="cal-sync-circle-btn" id="cal-sync-refresh-btn" title="Sync & Refresh latest calendar events" aria-label="Sync & Refresh latest calendar events">
                 <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.3" fill="none">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
@@ -2274,7 +2265,7 @@ function renderAgendaList() {
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg> Add Event
           </button>
-          <button class="agenda-add-btn" id="agenda-ai-post-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; border: none; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.25);">
+          <button class="agenda-add-btn" id="agenda-ai-post-btn" style="background: linear-gradient(135deg, #000000ff, #000000ff); color: white; border: none; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.25);">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px;">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg> AI Quick Post
