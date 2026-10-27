@@ -8,6 +8,9 @@
  * 
  * Copy the output hash into Vercel Dashboard → Settings → Environment Variables → ADMIN_PW_HASH
  */
+// hashing algo for security of admin password so that it is not leaked
+// this is one time use only
+// copy paste 
 
 const bcrypt = require('bcryptjs');
 
