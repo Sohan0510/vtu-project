@@ -1,6 +1,9 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
+
+# Update CA certificates to patch system trust store
+RUN apk update && apk upgrade --no-cache ca-certificates
 
 # Install dependencies
 COPY package*.json ./
